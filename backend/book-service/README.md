@@ -46,8 +46,15 @@ Service releases each reservation exactly once, then publishes correlated
 Migrations `202607190003_seed_popular_books` and
 `202607190004_seed_more_popular_books` seed 100 books from the Open Library
 monthly-trending snapshot retrieved on 2026-07-19, including the top-ranked
-**Atomic Habits**. Each book starts with five available copies. Cover URLs use Open
-Library's Covers API and are returned as `coverUrl` by the catalog API.
+**Atomic Habits**. Each book starts with five available copies and a cover URL. The
+90 additional titles seeded by migration `004` have original multi-paragraph
+library-staff descriptions; the initial ten retain their descriptive catalog copy.
+Compatibility migrations `202607190005_backfill_popular_book_descriptions`,
+`202607190006_correct_popular_book_descriptions`,
+`202607190007_enrich_popular_book_descriptions`, and
+`202607190008_correct_library_descriptions` upgrade earlier seed states without
+overwriting a librarian-authored description. Cover URLs are returned as `coverUrl`
+by the catalog API.
 
 Open Library API source: https://openlibrary.org/trending/monthly.json
 
