@@ -5,10 +5,17 @@ import { useState, type FormEvent } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 import { AuthApi } from "./auth-api";
 
-export function LogoutForm({ logoutEndpoint }: { logoutEndpoint: string }) {
+export function LogoutForm({
+  logoutEndpoint,
+  tone = "dark",
+}: {
+  logoutEndpoint: string;
+  tone?: "dark" | "light";
+}) {
   const [state, setState] = useState<
     { status: "idle" } | { status: "pending" } | { status: "error"; message: string }
   >({ status: "idle" });
@@ -27,9 +34,21 @@ export function LogoutForm({ logoutEndpoint }: { logoutEndpoint: string }) {
 
   return (
     <div>
-      {state.status === "error" && <Alert className="mb-3">{state.message}</Alert>}
+      {state.status === "error" && (
+        <Alert className="mb-3 bg-card text-card-foreground">{state.message}</Alert>
+      )}
       <form action="/api/auth/logout" method="post" onSubmit={handleSubmit}>
-        <Button variant="ghost" size="sm" type="submit" disabled={state.status === "pending"}>
+        <Button
+          className={cn(
+            tone === "dark"
+              ? "text-background hover:bg-background/10"
+              : "text-foreground hover:bg-secondary",
+          )}
+          variant="ghost"
+          size="sm"
+          type="submit"
+          disabled={state.status === "pending"}
+        >
           <LogOut aria-hidden="true" className="size-4" />
           {state.status === "pending" ? "Logging out…" : "Log out"}
         </Button>

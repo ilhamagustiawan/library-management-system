@@ -1,70 +1,46 @@
-import { BookMarked, BookOpen, Sparkles } from "lucide-react";
-import Link from "next/link";
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MemberHeader } from "@/components/member-header";
+import type { DashboardTab } from "@/features/library/dashboard-tab";
+import { LibraryDashboard } from "@/features/library/library-dashboard";
+import type { DashboardNotice } from "@/features/library/dashboard-notice";
+import { DashboardNoticeToast } from "@/features/library/dashboard-notice-toast";
+import type { LoadMemberLibraryResult } from "@/features/library/member-library";
 
 import type { OAuthUser } from "./oauth-client";
-import { LogoutForm } from "./logout-form";
 
 export function DashboardClient({
+  library,
+  initialTab,
   logoutEndpoint,
+  notice,
   session,
 }: {
+  library: LoadMemberLibraryResult;
+  initialTab: DashboardTab;
   logoutEndpoint: string;
+  notice: DashboardNotice;
   session: OAuthUser;
 }) {
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border/70">
-        <div className="mx-auto flex h-18 max-w-6xl items-center justify-between px-5 md:px-8">
-          <Link href="/" className="inline-flex items-center gap-2 font-display text-2xl font-semibold">
-            <span className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground">
-              <BookOpen aria-hidden="true" className="size-4" />
-            </span>
-            Libry
-          </Link>
-          <LogoutForm logoutEndpoint={logoutEndpoint} />
+    <div className="flex min-h-screen flex-col">
+      {notice.kind === "book-borrowed" && <DashboardNoticeToast notice={notice} />}
+      <MemberHeader logoutEndpoint={logoutEndpoint} />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 md:px-8 md:py-10">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-book-rust">Member home</p>
+          <h1 className="mt-2 text-3xl font-semibold leading-tight tracking-[-0.025em] sm:text-4xl">
+            Welcome, {session.name}.
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            Current loans, return history, and fines—together in one clear record.
+          </p>
         </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-18">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Member home</p>
-        <h1 className="mt-3 font-display text-5xl font-semibold tracking-tight sm:text-6xl">
-          Welcome, {session.name}.
-        </h1>
-        <p className="mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
-          Your quiet corner of the library is ready. More member tools will appear here as services
-          connect.
-        </p>
-
-        <div className="mt-10 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-          <Card className="overflow-hidden bg-primary text-primary-foreground">
-            <CardHeader>
-              <BookMarked aria-hidden="true" className="size-7 opacity-80" strokeWidth={1.6} />
-              <CardTitle className="pt-8 text-primary-foreground">Member card</CardTitle>
-              <CardDescription className="text-primary-foreground/70">
-                Authenticated membership · active session
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border-t border-primary-foreground/20 pt-5">
-                <p className="text-sm font-semibold">{session.name}</p>
-                <p className="mt-1 text-sm text-primary-foreground/70">{session.email}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-dashed bg-card/55">
-            <CardHeader>
-              <Sparkles aria-hidden="true" className="size-7 text-primary" strokeWidth={1.6} />
-              <CardTitle className="pt-8">Your reading activity will live here</CardTitle>
-              <CardDescription className="max-w-lg">
-                Catalog search, holds, loans, and due dates are intentionally omitted from this MVP
-                until backend contracts exist.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <div className="mt-7">
+          <LibraryDashboard initialTab={initialTab} result={library} />
         </div>
       </main>
+      <footer className="border-t border-border bg-secondary px-5 py-5 text-center text-xs text-muted-foreground">
+        Perpus Digital member portal
+      </footer>
     </div>
   );
 }

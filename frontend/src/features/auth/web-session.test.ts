@@ -4,7 +4,7 @@ import { WebSession } from "./web-session";
 
 const secret = "0123456789abcdef0123456789abcdef";
 const session: WebSession = {
-  user: { id: "user-123", name: "Maya Chen", email: "maya@libry.test" },
+  user: { id: "user-123", name: "Maya Chen", email: "maya@perpus-digital.test" },
   accessToken: "access-token",
   refreshToken: "refresh-token",
   tokenType: "Bearer",

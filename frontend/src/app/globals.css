@@ -18,6 +18,9 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-book-rust: var(--book-rust);
+  --color-book-gold: var(--book-gold);
+  --color-book-gold-dark: var(--book-gold-dark);
   --font-sans: "DM Sans", sans-serif;
   --font-display: "Fraunces", serif;
   --radius-sm: calc(var(--radius) - 4px);
@@ -26,23 +29,29 @@
 }
 
 :root {
-  --background: oklch(0.97 0.018 83);
-  --foreground: oklch(0.22 0.025 63);
-  --card: oklch(0.985 0.012 83);
-  --card-foreground: oklch(0.22 0.025 63);
-  --primary: oklch(0.39 0.105 35);
-  --primary-foreground: oklch(0.985 0.012 83);
-  --secondary: oklch(0.91 0.027 79);
-  --secondary-foreground: oklch(0.27 0.035 61);
-  --muted: oklch(0.92 0.018 82);
-  --muted-foreground: oklch(0.48 0.035 63);
-  --accent: oklch(0.74 0.12 73);
-  --accent-foreground: oklch(0.22 0.025 63);
-  --destructive: oklch(0.52 0.18 27);
-  --border: oklch(0.79 0.034 70);
-  --input: oklch(0.72 0.035 70);
-  --ring: oklch(0.5 0.105 35);
-  --radius: 0.5rem;
+  --background: #f3eee2;
+  --foreground: #211a14;
+  --card: #fffdf8;
+  --card-foreground: #211a14;
+  --primary: #005d55;
+  --primary-foreground: #fffdf8;
+  --secondary: #e6ddcc;
+  --secondary-foreground: #2b2118;
+  --muted: #ece5d8;
+  --muted-foreground: #665e54;
+  --accent: #dcc9a6;
+  --accent-foreground: #211a14;
+  --destructive: #a92b22;
+  --border: #c8bca8;
+  --input: #a99b86;
+  --ring: #005d55;
+  --book-rust: #a84d32;
+  --book-gold: #d2aa58;
+  --book-gold-dark: #6e4b0b;
+  --motion-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-duration-press: 140ms;
+  --motion-duration-ui: 180ms;
+  --radius: 0.25rem;
 }
 
 * {
@@ -61,20 +70,100 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-body::before {
-  position: fixed;
-  z-index: -1;
-  inset: 0;
-  opacity: 0.32;
-  background-image: radial-gradient(oklch(0.4 0.03 70 / 14%) 0.6px, transparent 0.6px);
-  background-size: 5px 5px;
-  content: "";
-  pointer-events: none;
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+.font-display {
+  font-optical-sizing: auto;
 }
 
 ::selection {
-  background: var(--accent);
+  background: var(--book-gold);
   color: var(--foreground);
+}
+
+.toaster {
+  --normal-bg: var(--card);
+  --normal-text: var(--card-foreground);
+  --normal-border: var(--border);
+  --border-radius: var(--radius);
+}
+
+@keyframes landing-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes catalog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.landing-copy > * {
+  animation: landing-enter 420ms var(--motion-ease-out) both;
+}
+
+.landing-copy > :nth-child(2) {
+  animation-delay: 50ms;
+}
+
+.landing-copy > :nth-child(3) {
+  animation-delay: 100ms;
+}
+
+.landing-copy > :nth-child(4) {
+  animation-delay: 150ms;
+}
+
+.landing-artwork {
+  animation: landing-enter 420ms 140ms var(--motion-ease-out) both;
+}
+
+.catalog-card[data-enter] {
+  animation: catalog-enter 260ms var(--motion-ease-out) both;
+}
+
+.catalog-card[data-enter="1"] { animation-delay: 30ms; }
+.catalog-card[data-enter="2"] { animation-delay: 60ms; }
+.catalog-card[data-enter="3"] { animation-delay: 90ms; }
+.catalog-card[data-enter="4"] { animation-delay: 120ms; }
+.catalog-card[data-enter="5"] { animation-delay: 150ms; }
+.catalog-card[data-enter="6"] { animation-delay: 180ms; }
+.catalog-card[data-enter="7"] { animation-delay: 210ms; }
+
+.book-card-cover,
+.book-card-arrow {
+  transform-origin: bottom center;
+  transition: transform var(--motion-duration-ui) var(--motion-ease-out);
+}
+
+.book-card:active .book-card-cover {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .book-card:hover .book-card-cover {
+    transform: translateY(-4px) rotate(-0.5deg);
+  }
+
+  .book-card:hover .book-card-arrow {
+    transform: translateX(3px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -82,12 +171,22 @@ body::before {
     scroll-behavior: auto;
   }
 
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .landing-copy > *,
+  .landing-artwork,
+  .catalog-card[data-enter] {
+    animation-delay: 0ms;
+    animation-duration: 200ms;
+    animation-name: landing-fade;
   }
+
+  .book-card:active .book-card-cover,
+  .book-card:hover .book-card-cover,
+  .book-card:hover .book-card-arrow {
+    transform: none;
+  }
+}
+
+@keyframes landing-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

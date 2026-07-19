@@ -6,7 +6,7 @@ export function Alert({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       role="alert"
-      className={cn("rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm", className)}
+      className={cn("rounded-sm border border-destructive/40 bg-destructive/5 p-3 text-sm", className)}
       {...props}
     />
   );

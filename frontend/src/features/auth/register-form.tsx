@@ -131,7 +131,7 @@ export function RegisterForm({
         )}
       />
       <Button className="w-full" type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? "Creating your account…" : "Create account"}
+        {mutation.isPending ? "Creating your account…" : "Create my member account"}
         {!mutation.isPending && <ArrowRight aria-hidden="true" className="size-4" />}
       </Button>
     </form>

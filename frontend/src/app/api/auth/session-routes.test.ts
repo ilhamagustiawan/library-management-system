@@ -12,7 +12,7 @@ const sessionSecret = "abcdef0123456789abcdef0123456789";
 function session(overrides: Partial<WebSessionValue> = {}) {
   return WebSession.seal(
     {
-      user: { id: "user-123", name: "Maya Chen", email: "maya@libry.test" },
+      user: { id: "user-123", name: "Maya Chen", email: "maya@perpus-digital.test" },
       accessToken: "access-token",
       refreshToken: "refresh-token",
       tokenType: "Bearer",

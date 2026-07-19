@@ -15,7 +15,7 @@ describe("LogoutForm", () => {
     const submit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
 
-    render(<LogoutForm logoutEndpoint="http://localhost:8081/api/v1/auth/logout" />);
+    render(<LogoutForm logoutEndpoint="http://localhost:8000/api/v1/auth/logout" />);
     await user.click(screen.getByRole("button", { name: "Log out" }));
 
     await waitFor(() => expect(submit).toHaveBeenCalledOnce());
@@ -29,12 +29,23 @@ describe("LogoutForm", () => {
     const submit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("unavailable"))));
 
-    render(<LogoutForm logoutEndpoint="http://localhost:8081/api/v1/auth/logout" />);
+    render(<LogoutForm logoutEndpoint="http://localhost:8000/api/v1/auth/logout" />);
     await user.click(screen.getByRole("button", { name: "Log out" }));
 
     expect(
       await screen.findByText("Could not reach authentication service. You remain signed in; try again."),
     ).toBeVisible();
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("supports member headers on light surfaces", () => {
+    render(
+      <LogoutForm
+        logoutEndpoint="http://localhost:8000/api/v1/auth/logout"
+        tone="light"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Log out" })).toHaveClass("text-foreground");
   });
 });

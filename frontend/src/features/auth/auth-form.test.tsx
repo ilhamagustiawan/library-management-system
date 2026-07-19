@@ -29,7 +29,7 @@ describe("LoginForm", () => {
 
     await user.type(screen.getByLabelText("Email address"), "wrong");
     await user.type(screen.getByLabelText("Password"), "short");
-    await user.click(screen.getByRole("button", { name: "Log in" }));
+    await user.click(screen.getByRole("button", { name: "Open my member account" }));
 
     expect(await screen.findByText("Enter a valid email address.")).toBeVisible();
   });
@@ -42,7 +42,7 @@ describe("LoginForm", () => {
       vi.fn(async () =>
         Response.json({
           code: "LMS-200000",
-          data: { id: "user-123", name: "Maya Chen", email: "maya@libry.test" },
+          data: { id: "user-123", name: "Maya Chen", email: "maya@perpus-digital.test" },
         }),
       ),
     );
@@ -50,9 +50,9 @@ describe("LoginForm", () => {
       <LoginForm loginEndpoint={loginEndpoint} navigate={navigate} returnTo={returnTo} />,
     );
 
-    await user.type(screen.getByLabelText("Email address"), "maya@libry.test");
+    await user.type(screen.getByLabelText("Email address"), "maya@perpus-digital.test");
     await user.type(screen.getByLabelText("Password"), "quietreading");
-    await user.click(screen.getByRole("button", { name: "Log in" }));
+    await user.click(screen.getByRole("button", { name: "Open my member account" }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith(returnTo));
   });
@@ -66,10 +66,10 @@ describe("RegisterForm", () => {
     renderWithQueryClient(<RegisterForm registerEndpoint={registerEndpoint} />);
 
     await user.type(screen.getByLabelText("Full name"), "Maya Chen");
-    await user.type(screen.getByLabelText("Email address"), "maya@libry.test");
+    await user.type(screen.getByLabelText("Email address"), "maya@perpus-digital.test");
     await user.type(screen.getByLabelText("Password", { selector: "#password" }), "quietreading");
     await user.type(screen.getByLabelText("Confirm password"), "differentpassword");
-    await user.click(screen.getByRole("button", { name: "Create account" }));
+    await user.click(screen.getByRole("button", { name: "Create my member account" }));
 
     expect(await screen.findByText("Passwords must match.")).toBeVisible();
     expect(screen.getByText("Accept the terms to create an account.")).toBeVisible();
@@ -84,7 +84,7 @@ describe("RegisterForm", () => {
         Response.json(
           {
             code: "LMS-200000",
-            data: { id: "user-123", name: "Maya Chen", email: "maya@libry.test" },
+            data: { id: "user-123", name: "Maya Chen", email: "maya@perpus-digital.test" },
           },
           { status: 201 },
         ),
@@ -95,11 +95,11 @@ describe("RegisterForm", () => {
     );
 
     await user.type(screen.getByLabelText("Full name"), "Maya Chen");
-    await user.type(screen.getByLabelText("Email address"), "maya@libry.test");
+    await user.type(screen.getByLabelText("Email address"), "maya@perpus-digital.test");
     await user.type(screen.getByLabelText("Password", { selector: "#password" }), "quietreading");
     await user.type(screen.getByLabelText("Confirm password"), "quietreading");
     await user.click(screen.getByRole("checkbox"));
-    await user.click(screen.getByRole("button", { name: "Create account" }));
+    await user.click(screen.getByRole("button", { name: "Create my member account" }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/login"));
   });

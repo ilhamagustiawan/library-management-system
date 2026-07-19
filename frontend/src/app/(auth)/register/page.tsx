@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,17 +7,27 @@ import { RegisterForm } from "@/features/auth/register-form";
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "Create account",
+  description:
+    "Create a Perpus Digital account to browse books, borrow online, and track every loan.",
+};
+
 export default function RegisterPage() {
   const config = AuthConfig.load();
 
   return (
-    <Card className="bg-card/80 shadow-[6px_7px_0_0_var(--secondary)]">
+    <Card className="border-t-4 border-t-book-rust shadow-[6px_6px_0_var(--accent)]">
       <CardHeader>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Join Libry</p>
-        <CardTitle as="h1">Create your member account</CardTitle>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+          Join Perpus Digital
+        </p>
+        <CardTitle as="h1" className="text-3xl sm:text-4xl">
+          Create your Perpus Digital account
+        </CardTitle>
         <CardDescription>
-          Start with the essentials. Library catalog and borrowing tools will connect when their
-          APIs are ready.
+          Create your member account to browse available books and keep your loans and reading
+          history together.
         </CardDescription>
       </CardHeader>
       <CardContent>

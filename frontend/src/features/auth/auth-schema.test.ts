@@ -5,7 +5,7 @@ import { LoginInput, RegisterInput } from "./auth-schema";
 describe("LoginInput", () => {
   it("accepts a valid email and password", () => {
     const result = LoginInput.schema.safeParse({
-      email: "maya@libry.test",
+      email: "maya@perpus-digital.test",
       password: "quietreading",
     });
 
@@ -23,7 +23,7 @@ describe("LoginInput", () => {
 
   it("accepts an existing account password shorter than registration policy", () => {
     expect(
-      LoginInput.schema.safeParse({ email: "maya@libry.test", password: "legacy8" }).success,
+      LoginInput.schema.safeParse({ email: "maya@perpus-digital.test", password: "legacy8" }).success,
     ).toBe(true);
   });
 });
@@ -32,7 +32,7 @@ describe("RegisterInput", () => {
   it("accepts complete matching registration details", () => {
     const result = RegisterInput.schema.safeParse({
       name: "Maya Chen",
-      email: "maya@libry.test",
+      email: "maya@perpus-digital.test",
       password: "quietreading",
       confirmPassword: "quietreading",
       acceptsTerms: true,
@@ -44,7 +44,7 @@ describe("RegisterInput", () => {
   it("rejects mismatched passwords", () => {
     const result = RegisterInput.schema.safeParse({
       name: "Maya Chen",
-      email: "maya@libry.test",
+      email: "maya@perpus-digital.test",
       password: "quietreading",
       confirmPassword: "differentpassword",
       acceptsTerms: true,
@@ -56,7 +56,7 @@ describe("RegisterInput", () => {
   it("requires terms acceptance", () => {
     const result = RegisterInput.schema.safeParse({
       name: "Maya Chen",
-      email: "maya@libry.test",
+      email: "maya@perpus-digital.test",
       password: "quietreading",
       confirmPassword: "quietreading",
       acceptsTerms: false,
@@ -68,7 +68,7 @@ describe("RegisterInput", () => {
   it("requires twelve characters for new passwords", () => {
     const result = RegisterInput.schema.safeParse({
       name: "Maya Chen",
-      email: "maya@libry.test",
+      email: "maya@perpus-digital.test",
       password: "legacy8",
       confirmPassword: "legacy8",
       acceptsTerms: true,

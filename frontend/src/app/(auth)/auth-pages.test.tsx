@@ -34,8 +34,9 @@ describe("authentication pages", () => {
     renderPage(page);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Open your member account" }),
+      screen.getByRole("heading", { level: 1, name: "Return to your reading" }),
     ).toBeVisible();
+    expect(screen.getByText(/browse available books, borrow your next read/i)).toBeVisible();
   });
 
   it("renders a browser OAuth start instead of a server redirect", async () => {
@@ -52,7 +53,8 @@ describe("authentication pages", () => {
     renderPage(<RegisterPage />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Create your member account" }),
+      screen.getByRole("heading", { level: 1, name: "Create your Perpus Digital account" }),
     ).toBeVisible();
+    expect(screen.getByText(/keep your loans and reading history together/i)).toBeVisible();
   });
 });

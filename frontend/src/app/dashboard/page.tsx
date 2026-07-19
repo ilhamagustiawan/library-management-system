@@ -7,6 +7,9 @@ import { AuthCookies } from "@/features/auth/auth-cookies";
 import { DashboardClient } from "@/features/auth/dashboard-client";
 import { SessionRefresh } from "@/features/auth/session-refresh";
 import { WebSession } from "@/features/auth/web-session";
+import { MemberLibrary } from "@/features/library/member-library";
+import { DashboardNotice } from "@/features/library/dashboard-notice";
+import { DashboardTab } from "@/features/library/dashboard-tab";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +17,14 @@ export const metadata: Metadata = {
   title: "Member home",
 };
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams: Promise<{
+    borrowed?: string | string[];
+    tab?: string | string[];
+  }>;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const config = AuthConfig.load();
   const sealedSession = (await cookies()).get(AuthCookies.sessionName)?.value;
   if (sealedSession === undefined) redirect("/login");
@@ -25,5 +35,20 @@ export default async function DashboardPage() {
     return <SessionRefresh />;
   }
 
-  return <DashboardClient logoutEndpoint={config.logoutEndpoint} session={openedSession.session.user} />;
+  const library = await MemberLibrary.load({
+    issuer: config.oauth.issuer,
+    accessToken: openedSession.session.accessToken,
+  });
+  const params = await searchParams;
+  const notice = DashboardNotice.fromSearchParams(params);
+
+  return (
+    <DashboardClient
+      library={library}
+      initialTab={DashboardTab.fromSearchParam(params.tab)}
+      logoutEndpoint={config.logoutEndpoint}
+      notice={notice}
+      session={openedSession.session.user}
+    />
+  );
 }

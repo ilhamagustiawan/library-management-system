@@ -7,17 +7,17 @@ describe("AuthApi.login", () => {
     const fetcher: typeof fetch = async (input, init) => {
       expect(String(input)).toBe("http://localhost:8000/api/v1/auth/login");
       expect(init?.credentials).toBe("include");
-      expect(init?.body).toBe(JSON.stringify({ email: "maya@libry.test", password: "quietreading" }));
+      expect(init?.body).toBe(JSON.stringify({ email: "maya@perpus-digital.test", password: "quietreading" }));
       return Response.json({
         code: "LMS-200000",
-        data: { id: "user-123", name: "Maya Chen", email: "maya@libry.test" },
+        data: { id: "user-123", name: "Maya Chen", email: "maya@perpus-digital.test" },
       });
     };
 
     await expect(
       AuthApi.login(
         "http://localhost:8000/api/v1/auth/login",
-        { email: "maya@libry.test", password: "quietreading" },
+        { email: "maya@perpus-digital.test", password: "quietreading" },
         fetcher,
       ),
     ).resolves.toEqual({ status: "success" });
@@ -33,7 +33,7 @@ describe("AuthApi.login", () => {
     await expect(
       AuthApi.login(
         "http://localhost:8000/api/v1/auth/login",
-        { email: "maya@libry.test", password: "wrong-password" },
+        { email: "maya@perpus-digital.test", password: "wrong-password" },
         fetcher,
       ),
     ).resolves.toEqual({
@@ -49,12 +49,12 @@ describe("AuthApi.register", () => {
       expect(String(input)).toBe("http://localhost:8000/api/v1/users");
       expect(init?.credentials).toBe("include");
       expect(init?.body).toBe(
-        JSON.stringify({ name: "Maya Chen", email: "maya@libry.test", password: "quietreading" }),
+        JSON.stringify({ name: "Maya Chen", email: "maya@perpus-digital.test", password: "quietreading" }),
       );
       return Response.json(
         {
           code: "LMS-200000",
-          data: { id: "user-123", name: "Maya Chen", email: "maya@libry.test" },
+          data: { id: "user-123", name: "Maya Chen", email: "maya@perpus-digital.test" },
         },
         { status: 201 },
       );
@@ -65,7 +65,7 @@ describe("AuthApi.register", () => {
         "http://localhost:8000/api/v1/users",
         {
           name: "Maya Chen",
-          email: "maya@libry.test",
+          email: "maya@perpus-digital.test",
           password: "quietreading",
           confirmPassword: "quietreading",
           acceptsTerms: true,

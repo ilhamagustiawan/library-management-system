@@ -115,7 +115,7 @@ describe("OAuth login routes", () => {
     fetcher.mockResolvedValueOnce(
       Response.json({
         code: "LMS-200000",
-        data: { id: "user-123", name: "Maya Chen", email: "maya@libry.test" },
+        data: { id: "user-123", name: "Maya Chen", email: "maya@perpus-digital.test" },
       }),
     );
     vi.stubGlobal("fetch", fetcher);

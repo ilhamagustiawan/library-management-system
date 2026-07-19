@@ -44,8 +44,11 @@ export function SessionRefresh({
   }, [fetcher, navigate, runExclusive]);
 
   return (
-    <main className="grid min-h-screen place-items-center px-5" aria-busy="true">
-      <p className="text-sm text-muted-foreground">Refreshing secure session…</p>
+    <main className="grid min-h-screen place-items-center bg-secondary px-5" aria-busy="true">
+      <div className="border border-border bg-card px-6 py-5 text-center">
+        <p className="font-display text-lg font-semibold text-foreground">Perpus Digital</p>
+        <p className="mt-2 text-sm text-muted-foreground">Refreshing secure session…</p>
+      </div>
     </main>
   );
 }

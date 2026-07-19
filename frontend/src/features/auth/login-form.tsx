@@ -73,7 +73,7 @@ export function LoginForm({
         <FormError id="password-error" message={form.formState.errors.password?.message} />
       </div>
       <Button className="w-full" type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? "Opening your account…" : "Log in"}
+        {mutation.isPending ? "Opening your account…" : "Open my member account"}
         {!mutation.isPending && <ArrowRight aria-hidden="true" className="size-4" />}
       </Button>
     </form>

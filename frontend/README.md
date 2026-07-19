@@ -1,4 +1,4 @@
-# Libry member web
+# Perpus Digital member web
 
 Next.js app for library members. Includes landing, User Service registration, OAuth login, and a guarded dashboard.
 
@@ -17,6 +17,10 @@ The example values match local Docker defaults. Replace both secrets outside loc
 Login uses Authorization Code with PKCE. The browser sends credentials through Kong to Auth Service. Next.js exchanges the code server-side, loads user info, and stores access and rotating refresh tokens in an AES-GCM encrypted, HttpOnly cookie. The dashboard refreshes access tokens shortly before expiry. No token enters browser-accessible storage.
 
 Registration uses User Service through Kong. User Service creates credentials through Auth Service, persists the member profile, and publishes `UserRegistered.v1` asynchronously.
+
+Members can return active loans from My Books, History, or Book Details. Every
+return is confirmed; overdue returns show the server-calculated fine before the
+loan changes.
 
 ## Checks
 

@@ -1,4 +1,5 @@
 import { Info } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Alert } from "@/components/ui/alert";
@@ -9,6 +10,11 @@ import { OAuthNavigation } from "@/features/auth/oauth-navigation";
 import { OAuthStart } from "@/features/auth/oauth-start";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Log in",
+  description: "Log in to browse books, borrow online, and review your Perpus Digital loans.",
+};
 
 type LoginPageProps = {
   searchParams: Promise<{ error?: string | string[]; return_to?: string | string[] }>;
@@ -35,23 +41,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     returnTo !== undefined && OAuthNavigation.isAuthorizeReturnTo(returnTo, config.oauth.issuer);
 
   return (
-    <Card className="bg-card/80 shadow-[6px_7px_0_0_var(--secondary)]">
+    <Card className="border-t-4 border-t-book-rust shadow-[6px_6px_0_var(--accent)]">
       <CardHeader>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Welcome back</p>
-        <CardTitle as="h1">Open your member account</CardTitle>
+        <CardTitle as="h1" className="text-3xl sm:text-4xl">Return to your reading</CardTitle>
         <CardDescription>
-          Sign in through the library authorization service. Access and refresh tokens stay in an
-          encrypted, HttpOnly server session.
+          Log in to browse available books, borrow your next read, and check every loan in one
+          place.
         </CardDescription>
       </CardHeader>
       <CardContent>
         {error !== undefined && (
           <Alert>{errors[error] ?? "Login failed safely. Start again; no session was created."}</Alert>
         )}
-        <div className="mb-5 flex gap-2 rounded-md bg-secondary/70 p-3 text-xs leading-5 text-muted-foreground">
+        <div className="mb-5 flex gap-2 rounded-sm border border-border bg-secondary p-3 text-xs leading-5 text-muted-foreground">
           <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
-          Credentials go directly to the auth service. Passwords and tokens are never stored in
-          browser-accessible storage.
+          Your sign-in is protected. Perpus Digital keeps your password and session details out of
+          browser storage.
         </div>
         {validReturnTo ? (
           <LoginForm loginEndpoint={config.loginEndpoint} returnTo={returnTo} />
@@ -59,7 +65,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <OAuthStart automatic={error === undefined} />
         )}
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          New to Libry?{" "}
+          New to Perpus Digital?{" "}
           <Link className="font-semibold text-foreground underline-offset-4 hover:underline" href="/register">
             Create an account
           </Link>
