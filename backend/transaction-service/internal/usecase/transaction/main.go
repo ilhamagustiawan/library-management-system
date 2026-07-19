@@ -12,9 +12,15 @@ type BorrowInput struct {
 }
 
 type ReturnInput struct {
-	LoanID         string
-	MemberID       string
-	AllowAnyMember bool
+	LoanID                  string
+	MemberID                string
+	AllowAnyMember          bool
+	AcceptedFineAmountMinor *int64
+}
+
+type ReturnQuoteInput struct {
+	LoanID   string
+	MemberID string
 }
 
 type ListInput struct {
@@ -34,6 +40,7 @@ type Page struct {
 
 type Usecase interface {
 	Borrow(context.Context, BorrowInput) (*entity.Loan, error)
+	QuoteReturn(context.Context, ReturnQuoteInput) (*entity.ReturnQuote, error)
 	Return(context.Context, ReturnInput) (*entity.Loan, bool, error)
 	List(context.Context, ListInput) (Page, error)
 }

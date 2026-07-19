@@ -8,14 +8,15 @@ import (
 )
 
 type ReturnCommand struct {
-	LoanID         string
-	MemberID       string
-	AllowAnyMember bool
-	EventID        string
-	TransactionID  string
-	FineID         string
-	ReturnedAt     time.Time
-	DailyFineMinor int64
+	LoanID                  string
+	MemberID                string
+	AllowAnyMember          bool
+	EventID                 string
+	TransactionID           string
+	FineID                  string
+	ReturnedAt              time.Time
+	DailyFineMinor          int64
+	AcceptedFineAmountMinor *int64
 }
 
 type PageFilter struct {
@@ -41,6 +42,7 @@ type LoanRepository interface {
 	CreatePending(context.Context, *entity.Loan) error
 	Activate(context.Context, string, string, time.Time) (*entity.Loan, error)
 	CancelPending(context.Context, string, time.Time) error
+	Get(context.Context, string) (*entity.Loan, error)
 	Return(context.Context, ReturnCommand) (*entity.Loan, bool, error)
 	ListTransactions(context.Context, PageFilter) (TransactionPage, error)
 	StockSyncStatus(context.Context, string) (entity.StockSyncStatus, error)

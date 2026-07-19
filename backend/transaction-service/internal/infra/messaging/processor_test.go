@@ -19,6 +19,7 @@ func (s *fakeStore) Activate(context.Context, string, string, time.Time) (*entit
 	return nil, nil
 }
 func (s *fakeStore) CancelPending(context.Context, string, time.Time) error { return nil }
+func (s *fakeStore) Get(context.Context, string) (*entity.Loan, error)      { return nil, nil }
 func (s *fakeStore) Return(context.Context, repository.ReturnCommand) (*entity.Loan, bool, error) {
 	return nil, false, nil
 }

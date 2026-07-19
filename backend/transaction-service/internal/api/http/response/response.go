@@ -26,6 +26,11 @@ type LoanSuccess struct {
 	Data *entity.Loan `json:"data"`
 }
 
+type ReturnQuoteSuccess struct {
+	Code string              `json:"code" example:"LMS-200000"`
+	Data *entity.ReturnQuote `json:"data"`
+}
+
 type PageSuccess struct {
 	Code string                  `json:"code" example:"LMS-200000"`
 	Data transactionusecase.Page `json:"data"`

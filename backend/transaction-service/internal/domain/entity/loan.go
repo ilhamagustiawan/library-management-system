@@ -1,6 +1,9 @@
 package entity
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 type LoanStatus string
 
@@ -47,6 +50,32 @@ type Fine struct {
 	Currency         string     `json:"currency" db:"currency"`
 	Status           FineStatus `json:"status" db:"fine_status"`
 	AssessedAt       time.Time  `json:"assessedAt" db:"assessed_at"`
+}
+
+type FineQuote struct {
+	OverdueDays      int    `json:"overdueDays"`
+	DailyRateMinor   int64  `json:"dailyRateMinor"`
+	TotalAmountMinor int64  `json:"totalAmountMinor"`
+	Currency         string `json:"currency"`
+}
+
+type ReturnQuote struct {
+	LoanID   string     `json:"loanId"`
+	BookID   string     `json:"bookId"`
+	DueAt    time.Time  `json:"dueAt"`
+	QuotedAt time.Time  `json:"quotedAt"`
+	Fine     *FineQuote `json:"fine"`
+}
+
+func QuoteFine(dueAt, quotedAt time.Time, dailyRateMinor int64) *FineQuote {
+	if !quotedAt.After(dueAt) {
+		return nil
+	}
+	overdueDays := int(math.Ceil(quotedAt.Sub(dueAt).Hours() / 24))
+	return &FineQuote{
+		OverdueDays: overdueDays, DailyRateMinor: dailyRateMinor,
+		TotalAmountMinor: int64(overdueDays) * dailyRateMinor, Currency: "IDR",
+	}
 }
 
 type TransactionType string

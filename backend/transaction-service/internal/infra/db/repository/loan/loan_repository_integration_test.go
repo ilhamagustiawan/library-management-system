@@ -97,6 +97,40 @@ func TestReturnAssessesFineAndConfirmsMatchingBookAck(t *testing.T) {
 	}
 }
 
+func TestReturnFineQuoteMismatchPreservesActiveLoan(t *testing.T) {
+	database := integrationDatabase(t)
+	store := NewRepository(database)
+	memberID, bookID := uuid.NewString(), uuid.NewString()
+	now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	loan := pendingLoan(memberID, bookID, now)
+	cleanupMember(t, database, memberID)
+
+	if err := store.CreatePending(context.Background(), loan); err != nil {
+		t.Fatalf("CreatePending() error = %v", err)
+	}
+	if _, err := store.Activate(context.Background(), loan.ID, uuid.NewString(), now); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+	accepted := int64(0)
+	_, _, err := store.Return(context.Background(), repository.ReturnCommand{
+		LoanID: loan.ID, MemberID: memberID, EventID: uuid.NewString(), TransactionID: uuid.NewString(),
+		FineID: uuid.NewString(), ReturnedAt: loan.DueAt.Add(time.Second), DailyFineMinor: 5000,
+		AcceptedFineAmountMinor: &accepted,
+	})
+	if !errors.Is(err, errs.ErrFineQuoteChanged) {
+		t.Fatalf("Return() error = %v, want fine quote changed", err)
+	}
+
+	preserved, getErr := store.Get(context.Background(), loan.ID)
+	if getErr != nil || preserved.Status != entity.LoanActive || preserved.ReturnedAt != nil {
+		t.Fatalf("loan after mismatch = %#v, error %v", preserved, getErr)
+	}
+	var fineCount int
+	if countErr := database.Get(&fineCount, "SELECT COUNT(*) FROM fines WHERE loan_id = ?", loan.ID); countErr != nil || fineCount != 0 {
+		t.Fatalf("fine count = %d, error %v", fineCount, countErr)
+	}
+}
+
 func integrationDatabase(t *testing.T) *sqlx.DB {
 	t.Helper()
 	dsn := os.Getenv("TRANSACTION_TEST_DATABASE_DSN")

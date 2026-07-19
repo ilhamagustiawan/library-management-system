@@ -11,6 +11,7 @@ const (
 	CodeBookNotFound     = "LMS-404002"
 	CodeLoanLimit        = "LMS-409004"
 	CodeActiveLoan       = "LMS-409005"
+	CodeFineQuoteChanged = "LMS-409006"
 	CodeStockUnavailable = "LMS-409003"
 	CodeDependency       = "LMS-503001"
 	CodeInternal         = "LMS-500000"
@@ -21,6 +22,7 @@ var (
 	ErrForbidden        = errors.New("operation forbidden")
 	ErrLoanLimit        = errors.New("active loan limit reached")
 	ErrActiveLoan       = errors.New("book already has an active loan")
+	ErrFineQuoteChanged = errors.New("fine quote changed")
 	ErrBookNotFound     = errors.New("book not found")
 	ErrStockUnavailable = errors.New("book stock unavailable")
 	ErrDependency       = errors.New("dependency unavailable")

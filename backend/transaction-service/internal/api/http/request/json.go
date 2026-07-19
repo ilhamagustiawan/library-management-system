@@ -13,6 +13,10 @@ type Borrow struct {
 	BookID string `json:"bookId" validate:"required,uuid4"`
 }
 
+type Return struct {
+	AcceptedFineAmountMinor *int64 `json:"acceptedFineAmountMinor" validate:"omitempty,gte=0"`
+}
+
 func DecodeStrictJSON(c *fiber.Ctx, target any) error {
 	decoder := json.NewDecoder(bytes.NewReader(c.Body()))
 	decoder.DisallowUnknownFields()

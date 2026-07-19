@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -120,6 +119,18 @@ func (r *Repository) CancelPending(ctx context.Context, loanID string, now time.
 	return tx.Commit()
 }
 
+func (r *Repository) Get(ctx context.Context, loanID string) (*entity.Loan, error) {
+	var loan entity.Loan
+	err := r.db.GetContext(ctx, &loan, `SELECT id, member_id, book_id, status, stock_sync_status, borrowed_at, due_at, returned_at, created_at, updated_at FROM loans WHERE id = ?`, loanID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errs.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &loan, nil
+}
+
 func (r *Repository) Return(ctx context.Context, command repository.ReturnCommand) (*entity.Loan, bool, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -142,11 +153,18 @@ func (r *Repository) Return(ctx context.Context, command repository.ReturnComman
 	if loan.Status != entity.LoanActive {
 		return nil, false, errs.ErrNotFound
 	}
-	overdue := calculateOverdueDays(loan.DueAt, command.ReturnedAt)
-	if overdue > 0 {
+	fineQuote := entity.QuoteFine(loan.DueAt, command.ReturnedAt, command.DailyFineMinor)
+	actualFineAmountMinor := int64(0)
+	if fineQuote != nil {
+		actualFineAmountMinor = fineQuote.TotalAmountMinor
+	}
+	if command.AcceptedFineAmountMinor != nil && *command.AcceptedFineAmountMinor != actualFineAmountMinor {
+		return nil, false, errs.ErrFineQuoteChanged
+	}
+	if fineQuote != nil {
 		loan.Fine = &entity.Fine{
-			ID: command.FineID, LoanID: loan.ID, MemberID: loan.MemberID, OverdueDays: overdue,
-			DailyRateMinor: command.DailyFineMinor, TotalAmountMinor: int64(overdue) * command.DailyFineMinor,
+			ID: command.FineID, LoanID: loan.ID, MemberID: loan.MemberID, OverdueDays: fineQuote.OverdueDays,
+			DailyRateMinor: fineQuote.DailyRateMinor, TotalAmountMinor: fineQuote.TotalAmountMinor,
 			Currency: "IDR", Status: entity.FineUnpaid, AssessedAt: command.ReturnedAt,
 		}
 		if _, err := tx.NamedExecContext(ctx, `
@@ -305,13 +323,6 @@ func getLoan(ctx context.Context, tx *sqlx.Tx, id string, lock bool) (*entity.Lo
 		}
 	}
 	return &loan, nil
-}
-
-func calculateOverdueDays(dueAt, returnedAt time.Time) int {
-	if !returnedAt.After(dueAt) {
-		return 0
-	}
-	return int(math.Ceil(returnedAt.Sub(dueAt).Hours() / 24))
 }
 
 func duplicateKey(err error) bool {

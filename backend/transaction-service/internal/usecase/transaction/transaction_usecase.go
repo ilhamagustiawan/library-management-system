@@ -101,6 +101,28 @@ func (u *usecase) Borrow(ctx context.Context, input BorrowInput) (*entity.Loan, 
 	return nil, fmt.Errorf("activate reserved loan: %w; stock reservation released and pending loan cancelled", err)
 }
 
+func (u *usecase) QuoteReturn(ctx context.Context, input ReturnQuoteInput) (*entity.ReturnQuote, error) {
+	loanID, memberID := strings.TrimSpace(input.LoanID), strings.TrimSpace(input.MemberID)
+	if loanID == "" || memberID == "" {
+		return nil, validation("loan and member IDs are required")
+	}
+	loan, err := u.repository.Get(ctx, loanID)
+	if err != nil {
+		return nil, mapLoanError("read loan return quote", err)
+	}
+	if loan.MemberID != memberID {
+		return nil, mapLoanError("read loan return quote", errs.ErrForbidden)
+	}
+	if loan.Status != entity.LoanActive {
+		return nil, mapLoanError("read loan return quote", errs.ErrNotFound)
+	}
+	quotedAt := u.now()
+	return &entity.ReturnQuote{
+		LoanID: loan.ID, BookID: loan.BookID, DueAt: loan.DueAt, QuotedAt: quotedAt,
+		Fine: entity.QuoteFine(loan.DueAt, quotedAt, u.dailyFineMinor),
+	}, nil
+}
+
 func (u *usecase) Return(ctx context.Context, input ReturnInput) (*entity.Loan, bool, error) {
 	if strings.TrimSpace(input.LoanID) == "" || strings.TrimSpace(input.MemberID) == "" {
 		return nil, false, validation("loan and member IDs are required")
@@ -109,7 +131,7 @@ func (u *usecase) Return(ctx context.Context, input ReturnInput) (*entity.Loan, 
 	loan, _, err := u.repository.Return(ctx, repository.ReturnCommand{
 		LoanID: input.LoanID, MemberID: input.MemberID, AllowAnyMember: input.AllowAnyMember,
 		EventID: u.newID(), TransactionID: u.newID(), FineID: u.newID(), ReturnedAt: now,
-		DailyFineMinor: u.dailyFineMinor,
+		DailyFineMinor: u.dailyFineMinor, AcceptedFineAmountMinor: input.AcceptedFineAmountMinor,
 	})
 	if err != nil {
 		return nil, false, mapLoanError("return loan", err)
@@ -177,6 +199,8 @@ func mapLoanError(operation string, err error) error {
 		return errs.New(http.StatusConflict, errs.CodeLoanLimit, "member already has the maximum of three active loans", nil, err)
 	case errors.Is(err, errs.ErrActiveLoan):
 		return errs.New(http.StatusConflict, errs.CodeActiveLoan, "member already has an active loan for this book", nil, err)
+	case errors.Is(err, errs.ErrFineQuoteChanged):
+		return errs.New(http.StatusConflict, errs.CodeFineQuoteChanged, "fine changed before return; review the updated amount and confirm again", nil, err)
 	case errors.Is(err, errs.ErrNotFound):
 		return errs.New(http.StatusNotFound, errs.CodeLoanNotFound, "loan was not found", nil, err)
 	case errors.Is(err, errs.ErrForbidden):

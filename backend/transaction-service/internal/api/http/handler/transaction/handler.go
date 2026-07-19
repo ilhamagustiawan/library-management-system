@@ -58,17 +58,50 @@ func (h *Handler) Borrow(c *fiber.Ctx) error {
 // ReturnSelf returns the authenticated member's loan and waits up to five seconds for stock acknowledgement.
 // @Summary Return own loan
 // @Tags Transactions
+// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param loanId path string true "Loan UUID" Format(uuid)
+// @Param request body request.Return false "Accepted fine quote"
 // @Success 200 {object} response.LoanSuccess "Book stock update confirmed"
 // @Success 202 {object} response.LoanSuccess "Return committed; stock acknowledgement pending"
 // @Failure 401 {object} response.ErrorResponse
 // @Failure 403 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Failure 422 {object} response.ErrorResponse
 // @Router /api/v1/transactions/loans/{loanId}/return [post]
 func (h *Handler) ReturnSelf(c *fiber.Ctx) error { return h.returnLoan(c, false) }
+
+// QuoteReturnSelf reports the fine that would be assessed if the authenticated member returned the loan now.
+// @Summary Quote own loan return
+// @Tags Transactions
+// @Produce json
+// @Security BearerAuth
+// @Param loanId path string true "Loan UUID" Format(uuid)
+// @Success 200 {object} response.ReturnQuoteSuccess
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
+// @Router /api/v1/transactions/loans/{loanId}/return [get]
+func (h *Handler) QuoteReturnSelf(c *fiber.Ctx) error {
+	credential, ok := middleware.Current(c)
+	if !ok {
+		return response.Write(c, http.StatusUnauthorized, errs.CodeInvalidToken, "authentication required")
+	}
+	loanID := c.Params("loanId")
+	if _, err := uuid.Parse(loanID); err != nil {
+		return response.ValidationError(c, "invalid loan ID")
+	}
+	quote, err := h.usecase.QuoteReturn(c.UserContext(), transactionusecase.ReturnQuoteInput{
+		LoanID: loanID, MemberID: credential.Subject,
+	})
+	if err != nil {
+		return response.Error(c, err)
+	}
+	return response.Success(c, http.StatusOK, quote)
+}
 
 // ReturnAny lets an authorized librarian return any active loan.
 // @Summary Return any member loan
@@ -94,7 +127,16 @@ func (h *Handler) returnLoan(c *fiber.Ctx, allowAny bool) error {
 	if _, err := uuid.Parse(loanID); err != nil {
 		return response.ValidationError(c, "invalid loan ID")
 	}
-	loan, confirmed, err := h.usecase.Return(c.UserContext(), transactionusecase.ReturnInput{LoanID: loanID, MemberID: credential.Subject, AllowAnyMember: allowAny})
+	var input request.Return
+	if len(c.Body()) > 0 {
+		if err := request.DecodeStrictJSON(c, &input); err != nil || h.validate.Struct(input) != nil {
+			return response.ValidationError(c, "invalid return data")
+		}
+	}
+	loan, confirmed, err := h.usecase.Return(c.UserContext(), transactionusecase.ReturnInput{
+		LoanID: loanID, MemberID: credential.Subject, AllowAnyMember: allowAny,
+		AcceptedFineAmountMinor: input.AcceptedFineAmountMinor,
+	})
 	if err != nil {
 		return response.Error(c, err)
 	}

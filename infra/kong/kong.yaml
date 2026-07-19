@@ -181,6 +181,8 @@ services:
         protocols:
           - http
         methods:
+          - GET
+          - HEAD
           - POST
         strip_path: false
         preserve_host: false

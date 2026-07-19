@@ -12,6 +12,11 @@ updates inventory through RabbitMQ and responds with `BookStockUpdated.v1`.
 The return endpoint waits five seconds, then returns `202` when acknowledgement
 remains pending. Retrying is safe.
 
+Members can `GET /api/v1/transactions/loans/{loanId}/return` for an authoritative
+fine quote. New clients send that quote as `acceptedFineAmountMinor` to the
+matching `POST`. If the amount changed, the service returns `LMS-409006` without
+changing the loan; bodyless legacy and librarian returns remain supported.
+
 ```sh
 cp .env.example .env
 go run . migrate --action up

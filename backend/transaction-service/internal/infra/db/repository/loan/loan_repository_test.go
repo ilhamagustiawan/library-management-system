@@ -3,9 +3,11 @@ package loan
 import (
 	"testing"
 	"time"
+
+	"github.com/ilhamagustiawan/library-management-system/backend/transaction-service/internal/domain/entity"
 )
 
-func TestCalculateOverdueDaysChargesStartedDays(t *testing.T) {
+func TestQuoteFineChargesStartedDays(t *testing.T) {
 	due := time.Date(2026, 7, 26, 10, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name     string
@@ -19,8 +21,13 @@ func TestCalculateOverdueDaysChargesStartedDays(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := calculateOverdueDays(due, test.returned); got != test.want {
-				t.Fatalf("calculateOverdueDays() = %d, want %d", got, test.want)
+			quote := entity.QuoteFine(due, test.returned, 5000)
+			got := 0
+			if quote != nil {
+				got = quote.OverdueDays
+			}
+			if got != test.want {
+				t.Fatalf("QuoteFine() days = %d, want %d", got, test.want)
 			}
 		})
 	}

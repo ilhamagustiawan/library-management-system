@@ -222,11 +222,70 @@ const docTemplate = `{
             }
         },
         "/api/v1/transactions/loans/{loanId}/return": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Quote own loan return",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Loan UUID",
+                        "name": "loanId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.ReturnQuoteSuccess"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
+                ],
+                "consumes": [
+                    "application/json"
                 ],
                 "produces": [
                     "application/json"
@@ -243,6 +302,14 @@ const docTemplate = `{
                         "name": "loanId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Accepted fine quote",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/request.Return"
+                        }
                     }
                 ],
                 "responses": {
@@ -272,6 +339,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
@@ -380,6 +453,23 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.FineQuote": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "dailyRateMinor": {
+                    "type": "integer"
+                },
+                "overdueDays": {
+                    "type": "integer"
+                },
+                "totalAmountMinor": {
+                    "type": "integer"
+                }
+            }
+        },
         "entity.FineStatus": {
             "type": "string",
             "enum": [
@@ -442,6 +532,26 @@ const docTemplate = `{
                 "LoanCancelled"
             ]
         },
+        "entity.ReturnQuote": {
+            "type": "object",
+            "properties": {
+                "bookId": {
+                    "type": "string"
+                },
+                "dueAt": {
+                    "type": "string"
+                },
+                "fine": {
+                    "$ref": "#/definitions/entity.FineQuote"
+                },
+                "loanId": {
+                    "type": "string"
+                },
+                "quotedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.StockSyncStatus": {
             "type": "string",
             "enum": [
@@ -503,6 +613,15 @@ const docTemplate = `{
                 }
             }
         },
+        "request.Return": {
+            "type": "object",
+            "properties": {
+                "acceptedFineAmountMinor": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
         "response.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -536,6 +655,18 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/transaction.Page"
+                }
+            }
+        },
+        "response.ReturnQuoteSuccess": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "LMS-200000"
+                },
+                "data": {
+                    "$ref": "#/definitions/entity.ReturnQuote"
                 }
             }
         },

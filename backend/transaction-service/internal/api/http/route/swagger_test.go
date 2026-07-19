@@ -56,6 +56,15 @@ func TestRegisterSwaggerServesUIAndTransactionContract(t *testing.T) {
 			t.Errorf("Swagger spec missing %s", path)
 		}
 	}
+	var returnOperations map[string]json.RawMessage
+	if err := json.Unmarshal(spec.Paths["/api/v1/transactions/loans/{loanId}/return"], &returnOperations); err != nil {
+		t.Fatalf("decode return operations: %v", err)
+	}
+	for _, method := range []string{"get", "post"} {
+		if _, ok := returnOperations[method]; !ok {
+			t.Errorf("Swagger return path missing %s operation", method)
+		}
+	}
 }
 
 func swaggerRequest(t *testing.T, target string) *http.Request {

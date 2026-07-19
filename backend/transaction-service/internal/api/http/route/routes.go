@@ -26,6 +26,7 @@ func (r *Router) Register(app *fiber.App) {
 	app.Get("/health/readiness", r.ready)
 	transactions := app.Group("/api/v1/transactions")
 	transactions.Post("/loans", middleware.RequireScope("loans:borrow:self"), r.transaction.Borrow)
+	transactions.Get("/loans/:loanId/return", middleware.RequireScope("loans:return:self"), r.transaction.QuoteReturnSelf)
 	transactions.Post("/loans/:loanId/return", middleware.RequireScope("loans:return:self"), r.transaction.ReturnSelf)
 	transactions.Get("/me", middleware.RequireScope("transactions:read:self"), r.transaction.ListSelf)
 	transactions.Get("/admin", middleware.RequireScope("transactions:read:any"), r.transaction.ListAny)

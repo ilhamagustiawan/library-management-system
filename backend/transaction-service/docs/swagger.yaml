@@ -21,6 +21,17 @@ definitions:
       totalAmountMinor:
         type: integer
     type: object
+  entity.FineQuote:
+    properties:
+      currency:
+        type: string
+      dailyRateMinor:
+        type: integer
+      overdueDays:
+        type: integer
+      totalAmountMinor:
+        type: integer
+    type: object
   entity.FineStatus:
     enum:
     - unpaid
@@ -64,6 +75,19 @@ definitions:
     - LoanActive
     - LoanReturned
     - LoanCancelled
+  entity.ReturnQuote:
+    properties:
+      bookId:
+        type: string
+      dueAt:
+        type: string
+      fine:
+        $ref: '#/definitions/entity.FineQuote'
+      loanId:
+        type: string
+      quotedAt:
+        type: string
+    type: object
   entity.StockSyncStatus:
     enum:
     - not_applicable
@@ -106,6 +130,12 @@ definitions:
     required:
     - bookId
     type: object
+  request.Return:
+    properties:
+      acceptedFineAmountMinor:
+        minimum: 0
+        type: integer
+    type: object
   response.ErrorResponse:
     properties:
       code:
@@ -129,6 +159,14 @@ definitions:
         type: string
       data:
         $ref: '#/definitions/transaction.Page'
+    type: object
+  response.ReturnQuoteSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/entity.ReturnQuote'
     type: object
   transaction.Page:
     properties:
@@ -287,7 +325,7 @@ paths:
       tags:
       - Transactions
   /api/v1/transactions/loans/{loanId}/return:
-    post:
+    get:
       parameters:
       - description: Loan UUID
         format: uuid
@@ -295,6 +333,49 @@ paths:
         name: loanId
         required: true
         type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ReturnQuoteSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Quote own loan return
+      tags:
+      - Transactions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Loan UUID
+        format: uuid
+        in: path
+        name: loanId
+        required: true
+        type: string
+      - description: Accepted fine quote
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/request.Return'
       produces:
       - application/json
       responses:
@@ -316,6 +397,10 @@ paths:
             $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/response.ErrorResponse'
         "422":
