@@ -13,7 +13,7 @@ services:
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_PLUGINS: bundled,lms-oauth2-introspection
-      LMS_INTROSPECTION_CLIENT_SECRET: ${OAUTH_INTROSPECTION_CLIENT_SECRET:?set OAUTH_INTROSPECTION_CLIENT_SECRET}
+      LMS_INTROSPECTION_CLIENT_SECRET: ${OAUTH_INTROSPECTION_CLIENT_SECRET:?copy .env.example to .env}
     depends_on:
       auth-service:
         condition: service_started
@@ -72,9 +72,6 @@ services:
       DATABASE_MIGRATION_URL: mysql://auth:auth_password@tcp(auth-db:3306)/auth
       OAUTH_ISSUER: http://localhost:8081
       LOGIN_URL: http://localhost:3000/login
-      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-local-development-only-client-secret}
-      OAUTH_INTROSPECTION_CLIENT_ID: kong-gateway
-      OAUTH_INTROSPECTION_CLIENT_SECRET: ${OAUTH_INTROSPECTION_CLIENT_SECRET:?set OAUTH_INTROSPECTION_CLIENT_SECRET}
       SESSION_COOKIE_SECURE: "false"
       TRUSTED_PROXIES: 172.30.0.2
     command: ["/bin/sh", "-c", "/app/auth-service migrate --action up && exec /app/auth-service serve"]
