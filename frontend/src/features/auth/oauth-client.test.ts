@@ -6,6 +6,7 @@ import { OAuthClient, type OAuthConfig } from "./oauth-client";
 
 const config: OAuthConfig = {
   issuer: "http://localhost:8000",
+  serviceURL: "http://gateway:8000",
   clientId: "member-nextjs-web",
   clientSecret: "0123456789abcdef0123456789abcdef",
   redirectUri: "http://localhost:3000/api/auth/callback/library",
@@ -17,6 +18,7 @@ describe("OAuthClient", () => {
     const flow = OAuthClient.createFlow();
     const authorizeURL = OAuthClient.authorizeURL(config, flow);
 
+    expect(authorizeURL.origin).toBe("http://localhost:8000");
     expect(authorizeURL.searchParams.get("state")).toBe(flow.state);
     expect(authorizeURL.searchParams.get("code_challenge_method")).toBe("S256");
     expect(authorizeURL.searchParams.get("code_challenge")).toBe(
@@ -26,7 +28,7 @@ describe("OAuthClient", () => {
 
   it("rotates a refresh token and returns normalized expiry", async () => {
     const fetcher: typeof fetch = async (input, init) => {
-      expect(String(input)).toBe("http://localhost:8000/oauth/token");
+      expect(String(input)).toBe("http://gateway:8000/oauth/token");
       expect(init?.headers).toEqual(
         expect.objectContaining({ Authorization: expect.stringMatching(/^Basic /) }),
       );

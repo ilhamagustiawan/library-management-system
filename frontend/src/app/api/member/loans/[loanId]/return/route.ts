@@ -89,7 +89,7 @@ function accessToken(request: NextRequest) {
   }
   return {
     status: "success",
-    issuer: config.oauth.issuer,
+    issuer: config.oauth.serviceURL,
     accessToken: openedSession.session.accessToken,
   } as const;
 }

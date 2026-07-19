@@ -4,7 +4,9 @@ import type { OAuthConfig } from "./oauth-client";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  SERVICE_ENV: z.enum(["development", "test", "production"]).optional(),
   AUTH_ISSUER: z.url(),
+  INTERNAL_GATEWAY_URL: z.url().optional(),
   USER_SERVICE_URL: z.url().default("http://localhost:8000"),
   AUTH_CLIENT_ID: z.string().min(1),
   AUTH_CLIENT_SECRET: z.string().min(32).max(72),
@@ -34,6 +36,14 @@ function validateTransport(url: URL, field: string, environment: string) {
   throw new Error(`Invalid auth configuration: ${field} must use HTTPS except loopback development`);
 }
 
+function validateInternalTransport(url: URL, environment: string) {
+  if (url.protocol === "https:") return;
+  if (environment !== "production" && url.protocol === "http:") return;
+  throw new Error(
+    "Invalid auth configuration: INTERNAL_GATEWAY_URL must use HTTPS outside development",
+  );
+}
+
 function load(environment: Record<string, string | undefined> = process.env): AuthConfig {
   const result = envSchema.safeParse(environment);
   if (!result.success) {
@@ -42,20 +52,26 @@ function load(environment: Record<string, string | undefined> = process.env): Au
   }
 
   const issuer = new URL(result.data.AUTH_ISSUER);
+  const serviceURL = new URL(result.data.INTERNAL_GATEWAY_URL ?? result.data.AUTH_ISSUER);
   const userService = new URL(result.data.USER_SERVICE_URL);
   const redirect = new URL(result.data.AUTH_REDIRECT_URI);
+  const serviceEnvironment = result.data.SERVICE_ENV ?? result.data.NODE_ENV;
   if (issuer.pathname !== "/" || issuer.search !== "" || issuer.hash !== "") {
     throw new Error("Invalid auth configuration: AUTH_ISSUER must be an origin");
   }
   if (userService.pathname !== "/" || userService.search !== "" || userService.hash !== "") {
     throw new Error("Invalid auth configuration: USER_SERVICE_URL must be an origin");
   }
+  if (serviceURL.pathname !== "/" || serviceURL.search !== "" || serviceURL.hash !== "") {
+    throw new Error("Invalid auth configuration: INTERNAL_GATEWAY_URL must be an origin");
+  }
   if (redirect.hash !== "") {
     throw new Error("Invalid auth configuration: AUTH_REDIRECT_URI must not contain a fragment");
   }
-  validateTransport(issuer, "AUTH_ISSUER", result.data.NODE_ENV);
-  validateTransport(userService, "USER_SERVICE_URL", result.data.NODE_ENV);
-  validateTransport(redirect, "AUTH_REDIRECT_URI", result.data.NODE_ENV);
+  validateTransport(issuer, "AUTH_ISSUER", serviceEnvironment);
+  validateTransport(userService, "USER_SERVICE_URL", serviceEnvironment);
+  validateTransport(redirect, "AUTH_REDIRECT_URI", serviceEnvironment);
+  validateInternalTransport(serviceURL, serviceEnvironment);
   const scopes = result.data.AUTH_SCOPES.split(/\s+/).filter(Boolean);
   if (scopes.length === 0) {
     throw new Error("Invalid auth configuration: AUTH_SCOPES");
@@ -64,6 +80,7 @@ function load(environment: Record<string, string | undefined> = process.env): Au
   return {
     oauth: {
       issuer: issuer.origin,
+      serviceURL: serviceURL.origin,
       clientId: result.data.AUTH_CLIENT_ID,
       clientSecret: result.data.AUTH_CLIENT_SECRET,
       redirectUri: redirect.toString(),

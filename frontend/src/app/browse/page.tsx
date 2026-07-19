@@ -23,7 +23,7 @@ export default async function BrowsePage() {
   if (WebSession.needsRefresh(openedSession.session)) return <SessionRefresh />;
 
   const catalog = await BookCatalog.listAvailable({
-    issuer: config.oauth.issuer,
+    issuer: config.oauth.serviceURL,
     accessToken: openedSession.session.accessToken,
   });
   if (catalog.status === "error" && catalog.error.kind === "unauthorized") redirect("/login");

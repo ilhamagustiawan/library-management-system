@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export type OAuthConfig = {
   issuer: string;
+  serviceURL: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
@@ -89,7 +90,7 @@ async function requestTokens(
 ): Promise<TokenResult> {
   let response: Response;
   try {
-    response = await fetcher(new URL("/oauth/token", config.issuer), {
+    response = await fetcher(new URL("/oauth/token", config.serviceURL), {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -168,7 +169,7 @@ async function userInfo(
 ): Promise<UserInfoResult> {
   let response: Response;
   try {
-    response = await fetcher(new URL("/api/v1/oauth/userinfo", config.issuer), {
+    response = await fetcher(new URL("/api/v1/oauth/userinfo", config.serviceURL), {
       headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
       cache: "no-store",
     });

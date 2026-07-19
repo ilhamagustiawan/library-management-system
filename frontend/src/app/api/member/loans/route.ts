@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   let response: Response;
   try {
-    response = await fetch(new URL("/api/v1/transactions/loans", config.oauth.issuer), {
+    response = await fetch(new URL("/api/v1/transactions/loans", config.oauth.serviceURL), {
       method: "POST",
       headers: {
         Accept: "application/json",

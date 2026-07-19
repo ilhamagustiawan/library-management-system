@@ -99,7 +99,7 @@ Configure the Next.js server with the matching local secret:
 
 ```dotenv
 # Next.js server
-AUTH_ISSUER=http://localhost:8081
+AUTH_ISSUER=http://localhost:8000
 AUTH_CLIENT_ID=member-nextjs-web
 AUTH_CLIENT_SECRET=local-development-only-client-secret
 ```
@@ -138,7 +138,6 @@ go run . create-admin --name "Grace Hopper" --email grace@example.com
 Public registration belongs to User Service at `POST /api/v1/users`. It calls
 Auth's `POST /internal/identities` with an idempotency key and User Service
 token. Auth always assigns `member`; extra fields such as `role` are rejected.
-Until User Service is available, frontend registration cannot complete.
 
 When `/oauth/authorize` has no auth-service session, it redirects to:
 

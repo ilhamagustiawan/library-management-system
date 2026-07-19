@@ -36,7 +36,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const library = await MemberLibrary.load({
-    issuer: config.oauth.issuer,
+    issuer: config.oauth.serviceURL,
     accessToken: openedSession.session.accessToken,
   });
   const params = await searchParams;

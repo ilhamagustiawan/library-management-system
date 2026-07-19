@@ -10,19 +10,21 @@ services:
       KONG_ANONYMOUS_REPORTS: "off"
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yaml
+      KONG_DNS_STALE_TTL: 0
+      KONG_DNS_VALID_TTL: 1
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_PLUGINS: bundled,lms-oauth2-introspection
       LMS_INTROSPECTION_CLIENT_SECRET: local-development-only-introspection-secret
     depends_on:
       auth-service:
-        condition: service_started
+        condition: service_healthy
       user-service:
-        condition: service_started
+        condition: service_healthy
       book-service:
-        condition: service_started
+        condition: service_healthy
       transaction-service:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - ./infra/kong/kong.yaml:/kong/declarative/kong.yaml:ro
     ports:
@@ -33,6 +35,39 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    networks:
+      - gateway
+
+  frontend:
+    build:
+      context: ./frontend
+    image: library-management-frontend:local
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      SERVICE_ENV: development
+      AUTH_ISSUER: http://localhost:8000
+      INTERNAL_GATEWAY_URL: http://gateway:8000
+      USER_SERVICE_URL: http://localhost:8000
+      AUTH_CLIENT_ID: member-nextjs-web
+      AUTH_CLIENT_SECRET: local-development-only-client-secret
+      AUTH_REDIRECT_URI: http://localhost:3000/api/auth/callback/library
+      AUTH_SCOPES: loans:borrow:self loans:return:self transactions:read:self books:read
+      AUTH_SESSION_SECRET: local-development-only-session-secret
+    ports:
+      - 127.0.0.1:3000:3000
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000').then(response=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     networks:
       - gateway
 
@@ -82,6 +117,12 @@ services:
     command: ["/bin/sh", "-c", "/app/auth-service migrate --action up && exec /app/auth-service serve"]
     ports:
       - 127.0.0.1:8081:8081
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8081/health/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     networks:
       - gateway
       - auth-db
@@ -157,6 +198,12 @@ services:
     command: ["/bin/sh", "-c", "/app/user-service migrate --action up && exec /app/user-service serve"]
     ports:
       - 127.0.0.1:8082:8080
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     networks:
       - gateway
       - user-db
@@ -214,6 +261,12 @@ services:
     command: ["/bin/sh", "-c", "/app/book-service migrate --action up && exec /app/book-service serve"]
     ports:
       - 127.0.0.1:8083:8080
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     networks:
       - gateway
       - book-db
@@ -275,6 +328,12 @@ services:
     command: ["/bin/sh", "-c", "/app/transaction-service migrate --action up && exec /app/transaction-service serve"]
     ports:
       - 127.0.0.1:8084:8080
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     networks:
       - gateway
       - transaction-db

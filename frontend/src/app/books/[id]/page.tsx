@@ -33,8 +33,8 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
   if (WebSession.needsRefresh(openedSession.session)) return <SessionRefresh />;
 
   const [catalog, library] = await Promise.all([
-    BookCatalog.get({ issuer: config.oauth.issuer, accessToken: openedSession.session.accessToken, id }),
-    MemberLibrary.load({ issuer: config.oauth.issuer, accessToken: openedSession.session.accessToken }),
+    BookCatalog.get({ issuer: config.oauth.serviceURL, accessToken: openedSession.session.accessToken, id }),
+    MemberLibrary.load({ issuer: config.oauth.serviceURL, accessToken: openedSession.session.accessToken }),
   ]);
   if (catalog.status === "error" && catalog.error.kind === "unauthorized") redirect("/login");
   if (catalog.status === "error" && catalog.error.kind === "not-found") notFound();

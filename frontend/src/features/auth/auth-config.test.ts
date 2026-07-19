@@ -6,6 +6,8 @@ describe("AuthConfig", () => {
   it("loads server-only OAuth and session settings", () => {
     const config = AuthConfig.load({
       AUTH_ISSUER: "http://localhost:8000",
+      INTERNAL_GATEWAY_URL: "http://gateway:8000",
+      SERVICE_ENV: "development",
       USER_SERVICE_URL: "http://localhost:8000",
       AUTH_CLIENT_ID: "member-nextjs-web",
       AUTH_CLIENT_SECRET: "0123456789abcdef0123456789abcdef",
@@ -21,9 +23,22 @@ describe("AuthConfig", () => {
       "books:read",
     ]);
     expect(config.oauth.clientId).toBe("member-nextjs-web");
+    expect(config.oauth.serviceURL).toBe("http://gateway:8000");
     expect(config.secureCookies).toBe(false);
     expect(config.loginEndpoint).toBe("http://localhost:8000/api/v1/auth/login");
     expect(config.registerEndpoint).toBe("http://localhost:8000/api/v1/users");
+  });
+
+  it("uses the public issuer for server requests when no internal gateway is configured", () => {
+    const config = AuthConfig.load({
+      AUTH_ISSUER: "http://localhost:8000",
+      AUTH_CLIENT_ID: "member-nextjs-web",
+      AUTH_CLIENT_SECRET: "0123456789abcdef0123456789abcdef",
+      AUTH_REDIRECT_URI: "http://localhost:3000/api/auth/callback/library",
+      AUTH_SESSION_SECRET: "abcdef0123456789abcdef0123456789",
+    });
+
+    expect(config.oauth.serviceURL).toBe("http://localhost:8000");
   });
 
   it("rejects weak session encryption secrets", () => {
