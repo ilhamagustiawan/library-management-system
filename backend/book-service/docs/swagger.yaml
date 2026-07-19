@@ -1,0 +1,553 @@
+basePath: /
+definitions:
+  entity.Reservation:
+    properties:
+      bookId:
+        type: string
+      createdAt:
+        type: string
+      releasedAt:
+        type: string
+      status:
+        $ref: '#/definitions/entity.ReservationStatus'
+      transactionId:
+        type: string
+    type: object
+  entity.ReservationStatus:
+    enum:
+    - active
+    - released
+    type: string
+    x-enum-varnames:
+    - ReservationActive
+    - ReservationReleased
+  entity.Stock:
+    properties:
+      availableCopies:
+        type: integer
+      bookId:
+        type: string
+      totalCopies:
+        type: integer
+    type: object
+  request.CreateBook:
+    properties:
+      author:
+        example: Robert C. Martin
+        maxLength: 255
+        type: string
+      coverUrl:
+        example: https://covers.openlibrary.org/b/id/10521270-M.jpg
+        maxLength: 512
+        type: string
+      description:
+        example: A handbook of agile software craftsmanship.
+        maxLength: 5000
+        type: string
+      isbn:
+        example: "9780132350884"
+        maxLength: 32
+        type: string
+      publicationYear:
+        example: 2008
+        minimum: 1000
+        type: integer
+      title:
+        example: Clean Code
+        maxLength: 255
+        type: string
+      totalCopies:
+        example: 3
+        minimum: 1
+        type: integer
+    required:
+    - author
+    - isbn
+    - title
+    - totalCopies
+    type: object
+  request.UpdateBook:
+    properties:
+      author:
+        example: Robert C. Martin
+        type: string
+      coverUrl:
+        example: https://covers.openlibrary.org/b/id/10521270-M.jpg
+        type: string
+      description:
+        example: Updated description
+        type: string
+      isbn:
+        example: "9780132350884"
+        type: string
+      publicationYear:
+        example: 2009
+        type: integer
+      title:
+        example: Clean Code
+        type: string
+      totalCopies:
+        example: 4
+        type: integer
+    type: object
+  response.Book:
+    properties:
+      author:
+        example: Robert C. Martin
+        type: string
+      availableCopies:
+        example: 2
+        type: integer
+      coverUrl:
+        example: https://covers.openlibrary.org/b/id/10521270-M.jpg
+        type: string
+      createdAt:
+        example: "2026-07-19T08:00:00Z"
+        type: string
+      description:
+        example: A handbook of agile software craftsmanship.
+        type: string
+      id:
+        example: f81d4fae-7dec-41d0-a765-00a0c91e6bf6
+        type: string
+      isbn:
+        example: "9780132350884"
+        type: string
+      publicationYear:
+        example: 2008
+        type: integer
+      title:
+        example: Clean Code
+        type: string
+      totalCopies:
+        example: 3
+        type: integer
+      updatedAt:
+        example: "2026-07-19T08:00:00Z"
+        type: string
+    type: object
+  response.BookPage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.Book'
+        type: array
+      pagination:
+        $ref: '#/definitions/response.Pagination'
+    type: object
+  response.BookPageSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/response.BookPage'
+    type: object
+  response.BookSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/response.Book'
+    type: object
+  response.ErrorResponse:
+    properties:
+      code:
+        example: LMS-422001
+        type: string
+      data: {}
+      message:
+        example: invalid request data
+        type: string
+    type: object
+  response.Health:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  response.Pagination:
+    properties:
+      page:
+        example: 1
+        type: integer
+      pageSize:
+        example: 20
+        type: integer
+      totalItems:
+        example: 42
+        type: integer
+      totalPages:
+        example: 3
+        type: integer
+    type: object
+  response.ReservationSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/entity.Reservation'
+    type: object
+  response.StockSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/entity.Stock'
+    type: object
+info:
+  contact: {}
+  description: Catalog, inventory, and atomic stock reservation service.
+  title: Library Management Book API
+  version: "1.0"
+paths:
+  /api/v1/books:
+    get:
+      parameters:
+      - description: Title, author, or ISBN search
+        in: query
+        name: q
+        type: string
+      - description: Only books with available stock
+        in: query
+        name: availableOnly
+        type: boolean
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        maximum: 100
+        name: pageSize
+        type: integer
+      - description: Sort field
+        enum:
+        - title
+        - author
+        - createdAt
+        in: query
+        name: sortBy
+        type: string
+      - description: Sort order
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sortOrder
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.BookPageSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: List books
+      tags:
+      - Books
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Book data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateBook'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.BookSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Create book
+      tags:
+      - Books
+  /api/v1/books/{id}:
+    delete:
+      parameters:
+      - description: Book UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Archive book
+      tags:
+      - Books
+    get:
+      parameters:
+      - description: Book UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.BookSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get book
+      tags:
+      - Books
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Book UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Partial book data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateBook'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.BookSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Update book
+      tags:
+      - Books
+  /health/liveness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Health'
+      summary: Liveness
+      tags:
+      - Health
+  /health/readiness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Health'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Readiness
+      tags:
+      - Health
+  /internal/v1/books/{id}/reservations/{transactionId}:
+    delete:
+      parameters:
+      - description: Book UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Transaction UUID
+        in: path
+        name: transactionId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Release book stock
+      tags:
+      - Internal stock
+    put:
+      parameters:
+      - description: Book UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Transaction UUID
+        in: path
+        name: transactionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Existing active reservation
+          schema:
+            $ref: '#/definitions/response.ReservationSuccess'
+        "201":
+          description: Reservation created
+          schema:
+            $ref: '#/definitions/response.ReservationSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Reserve book stock
+      tags:
+      - Internal stock
+  /internal/v1/books/{id}/stock:
+    get:
+      parameters:
+      - description: Book UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.StockSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Read internal book stock
+      tags:
+      - Internal stock
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
