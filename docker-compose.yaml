@@ -13,9 +13,15 @@ services:
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_PLUGINS: bundled,lms-oauth2-introspection
-      LMS_INTROSPECTION_CLIENT_SECRET: ${OAUTH_INTROSPECTION_CLIENT_SECRET:?copy .env.example to .env}
+      LMS_INTROSPECTION_CLIENT_SECRET: local-development-only-introspection-secret
     depends_on:
       auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      book-service:
+        condition: service_started
+      transaction-service:
         condition: service_started
     volumes:
       - ./infra/kong/kong.yaml:/kong/declarative/kong.yaml:ro
@@ -28,8 +34,7 @@ services:
       retries: 10
       start_period: 15s
     networks:
-      gateway:
-        ipv4_address: 172.30.0.2
+      - gateway
 
   auth-db:
     image: mysql:8.4.10
@@ -70,10 +75,10 @@ services:
       ALLOWED_ORIGIN: http://localhost:3000
       DATABASE_DSN: auth:auth_password@tcp(auth-db:3306)/auth?parseTime=true&loc=UTC&charset=utf8mb4
       DATABASE_MIGRATION_URL: mysql://auth:auth_password@tcp(auth-db:3306)/auth
-      OAUTH_ISSUER: http://localhost:8081
+      OAUTH_ISSUER: http://localhost:8000
+      OAUTH_JWT_SIGNING_KEY: local-development-only-jwt-signing-key
       LOGIN_URL: http://localhost:3000/login
       SESSION_COOKIE_SECURE: "false"
-      TRUSTED_PROXIES: 172.30.0.2
     command: ["/bin/sh", "-c", "/app/auth-service migrate --action up && exec /app/auth-service serve"]
     ports:
       - 127.0.0.1:8081:8081
@@ -81,12 +86,211 @@ services:
       - gateway
       - auth-db
 
+  user-db:
+    image: mysql:8.4.10
+    environment:
+      # Local development credentials. Do not reuse outside this stack.
+      MYSQL_DATABASE: users
+      MYSQL_USER: users
+      MYSQL_PASSWORD: users_password
+      MYSQL_ROOT_PASSWORD: root_password
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - user_mysql_data:/var/lib/mysql
+    ports:
+      - 127.0.0.1:3307:3306
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - user-db
+
+  rabbitmq:
+    image: rabbitmq:4.3.2-management-alpine
+    environment:
+      # Local development credentials. Do not reuse outside this stack.
+      RABBITMQ_DEFAULT_USER: library
+      RABBITMQ_DEFAULT_PASS: library_password
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - 127.0.0.1:5672:5672
+      - 127.0.0.1:15672:15672
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - events
+
+  user-service:
+    build:
+      context: ./backend/user-service
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_started
+      user-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVICE_ENV: development
+      SERVICE_PORT: :8080
+      ALLOWED_ORIGIN: http://localhost:3000
+      DATABASE_DSN: users:users_password@tcp(user-db:3306)/users?parseTime=true&loc=UTC&charset=utf8mb4
+      DATABASE_MIGRATION_URL: mysql://users:users_password@tcp(user-db:3306)/users
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AUTH_CLIENT_ID: user-service
+      AUTH_CLIENT_SECRET: local-development-only-user-service-secret
+      AUTH_SCOPE: identities:create
+      RABBITMQ_URL: amqp://library:library_password@rabbitmq:5672/
+    command: ["/bin/sh", "-c", "/app/user-service migrate --action up && exec /app/user-service serve"]
+    ports:
+      - 127.0.0.1:8082:8080
+    networks:
+      - gateway
+      - user-db
+      - events
+
+  book-db:
+    image: mysql:8.4.10
+    environment:
+      # Local development credentials. Do not reuse outside this stack.
+      MYSQL_DATABASE: book
+      MYSQL_USER: book
+      MYSQL_PASSWORD: book_password
+      MYSQL_ROOT_PASSWORD: root_password
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - book_mysql_data:/var/lib/mysql
+    ports:
+      - 127.0.0.1:3308:3306
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - book-db
+
+  book-service:
+    build:
+      context: ./backend/book-service
+    restart: unless-stopped
+    depends_on:
+      book-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVICE_ENV: development
+      SERVICE_PORT: :8080
+      ALLOWED_ORIGIN: http://localhost:3000
+      DATABASE_DSN: book:book_password@tcp(book-db:3306)/book?parseTime=true&loc=UTC&charset=utf8mb4
+      DATABASE_MIGRATION_URL: mysql://book:book_password@tcp(book-db:3306)/book
+      AUTH_INTROSPECTION_URL: http://auth-service:8081/oauth/introspect
+      INTROSPECTION_CLIENT_ID: book-service
+      INTROSPECTION_CLIENT_SECRET: local-development-only-book-introspection-secret
+      AUTH_INTROSPECTION_TIMEOUT: 2s
+      OAUTH_ISSUER: http://localhost:8000
+      OAUTH_AUDIENCE: book-service
+      TRANSACTION_SERVICE_CLIENT_ID: transaction-service
+      RABBITMQ_URL: amqp://library:library_password@rabbitmq:5672/
+    command: ["/bin/sh", "-c", "/app/book-service migrate --action up && exec /app/book-service serve"]
+    ports:
+      - 127.0.0.1:8083:8080
+    networks:
+      - gateway
+      - book-db
+      - events
+
+  transaction-db:
+    image: mysql:8.4.10
+    environment:
+      # Local development credentials. Do not reuse outside this stack.
+      MYSQL_DATABASE: transactions
+      MYSQL_USER: transactions
+      MYSQL_PASSWORD: transactions_password
+      MYSQL_ROOT_PASSWORD: root_password
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - transaction_mysql_data:/var/lib/mysql
+    ports:
+      - 127.0.0.1:3309:3306
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - transaction-db
+
+  transaction-service:
+    build:
+      context: ./backend/transaction-service
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_started
+      book-service:
+        condition: service_started
+      transaction-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVICE_ENV: development
+      SERVICE_PORT: :8080
+      ALLOWED_ORIGIN: http://localhost:3000
+      DATABASE_DSN: transactions:transactions_password@tcp(transaction-db:3306)/transactions?parseTime=true&loc=UTC&charset=utf8mb4
+      DATABASE_MIGRATION_URL: mysql://transactions:transactions_password@tcp(transaction-db:3306)/transactions
+      AUTH_TOKEN_URL: http://auth-service:8081/oauth/token
+      BOOK_SERVICE_URL: http://book-service:8080
+      BOOK_SERVICE_CLIENT_ID: transaction-service
+      BOOK_SERVICE_CLIENT_SECRET: local-development-only-transaction-service-secret
+      RABBITMQ_URL: amqp://library:library_password@rabbitmq:5672/
+      LOAN_TERM: 168h
+      FINE_DAILY_RATE_MINOR: "5000"
+      STOCK_ACK_TIMEOUT: 5s
+    command: ["/bin/sh", "-c", "/app/transaction-service migrate --action up && exec /app/transaction-service serve"]
+    ports:
+      - 127.0.0.1:8084:8080
+    networks:
+      - gateway
+      - transaction-db
+      - events
+
 networks:
   gateway:
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
   auth-db:
+  user-db:
+  events:
+  book-db:
+  transaction-db:
 
 volumes:
   auth_mysql_data:
+  user_mysql_data:
+  rabbitmq_data:
+  book_mysql_data:
+  transaction_mysql_data:
