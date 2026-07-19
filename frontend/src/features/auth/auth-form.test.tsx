@@ -17,8 +17,9 @@ function renderWithQueryClient(component: React.ReactNode) {
 }
 
 describe("LoginForm", () => {
-  const loginEndpoint = "http://localhost:8081/api/v1/auth/login";
-  const returnTo = "http://localhost:8081/oauth/authorize?client_id=nextjs";
+  const loginEndpoint = "http://localhost:8000/api/v1/auth/login";
+  const returnTo =
+    "http://localhost:8000/oauth/authorize?client_id=member-nextjs-web";
 
   afterEach(() => vi.unstubAllGlobals());
 
@@ -58,7 +59,7 @@ describe("LoginForm", () => {
 });
 
 describe("RegisterForm", () => {
-  const registerEndpoint = "http://localhost:8081/api/v1/auth/register";
+  const registerEndpoint = "http://localhost:8000/api/v1/users";
 
   it("requires matching passwords and terms acceptance", async () => {
     const user = userEvent.setup();

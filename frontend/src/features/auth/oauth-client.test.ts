@@ -5,11 +5,11 @@ import { describe, expect, it } from "vitest";
 import { OAuthClient, type OAuthConfig } from "./oauth-client";
 
 const config: OAuthConfig = {
-  issuer: "http://localhost:8081",
-  clientId: "nextjs",
+  issuer: "http://localhost:8000",
+  clientId: "member-nextjs-web",
   clientSecret: "0123456789abcdef0123456789abcdef",
   redirectUri: "http://localhost:3000/api/auth/callback/library",
-  scopes: ["library:read", "library:write"],
+  scopes: ["books:read", "loans:borrow:self"],
 };
 
 describe("OAuthClient", () => {
@@ -26,7 +26,7 @@ describe("OAuthClient", () => {
 
   it("rotates a refresh token and returns normalized expiry", async () => {
     const fetcher: typeof fetch = async (input, init) => {
-      expect(String(input)).toBe("http://localhost:8081/oauth/token");
+      expect(String(input)).toBe("http://localhost:8000/oauth/token");
       expect(init?.headers).toEqual(
         expect.objectContaining({ Authorization: expect.stringMatching(/^Basic /) }),
       );
@@ -37,7 +37,7 @@ describe("OAuthClient", () => {
         refresh_token: "new-refresh-token",
         token_type: "Bearer",
         expires_in: 900,
-        scope: "library:read library:write",
+        scope: "books:read loans:borrow:self",
       });
     };
 
@@ -49,7 +49,7 @@ describe("OAuthClient", () => {
         accessToken: "new-access-token",
         refreshToken: "new-refresh-token",
         tokenType: "Bearer",
-        scope: "library:read library:write",
+        scope: "books:read loans:borrow:self",
         expiresAt: 1_900,
       },
     });

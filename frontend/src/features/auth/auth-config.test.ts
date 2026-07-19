@@ -5,24 +5,32 @@ import { AuthConfig } from "./auth-config";
 describe("AuthConfig", () => {
   it("loads server-only OAuth and session settings", () => {
     const config = AuthConfig.load({
-      AUTH_ISSUER: "http://localhost:8081",
-      AUTH_CLIENT_ID: "nextjs",
+      AUTH_ISSUER: "http://localhost:8000",
+      USER_SERVICE_URL: "http://localhost:8000",
+      AUTH_CLIENT_ID: "member-nextjs-web",
       AUTH_CLIENT_SECRET: "0123456789abcdef0123456789abcdef",
       AUTH_REDIRECT_URI: "http://localhost:3000/api/auth/callback/library",
-      AUTH_SCOPES: "library:read library:write",
+      AUTH_SCOPES: "loans:borrow:self loans:return:self transactions:read:self books:read",
       AUTH_SESSION_SECRET: "abcdef0123456789abcdef0123456789",
     });
 
-    expect(config.oauth.scopes).toEqual(["library:read", "library:write"]);
+    expect(config.oauth.scopes).toEqual([
+      "loans:borrow:self",
+      "loans:return:self",
+      "transactions:read:self",
+      "books:read",
+    ]);
+    expect(config.oauth.clientId).toBe("member-nextjs-web");
     expect(config.secureCookies).toBe(false);
-    expect(config.loginEndpoint).toBe("http://localhost:8081/api/v1/auth/login");
+    expect(config.loginEndpoint).toBe("http://localhost:8000/api/v1/auth/login");
+    expect(config.registerEndpoint).toBe("http://localhost:8000/api/v1/users");
   });
 
   it("rejects weak session encryption secrets", () => {
     expect(() =>
       AuthConfig.load({
-        AUTH_ISSUER: "http://localhost:8081",
-        AUTH_CLIENT_ID: "nextjs",
+        AUTH_ISSUER: "http://localhost:8000",
+        AUTH_CLIENT_ID: "member-nextjs-web",
         AUTH_CLIENT_SECRET: "0123456789abcdef0123456789abcdef",
         AUTH_REDIRECT_URI: "http://localhost:3000/api/auth/callback/library",
         AUTH_SESSION_SECRET: "too-short",
@@ -34,7 +42,7 @@ describe("AuthConfig", () => {
     expect(() =>
       AuthConfig.load({
         AUTH_ISSUER: "http://auth.example",
-        AUTH_CLIENT_ID: "nextjs",
+        AUTH_CLIENT_ID: "member-nextjs-web",
         AUTH_CLIENT_SECRET: "0123456789abcdef0123456789abcdef",
         AUTH_REDIRECT_URI: "http://app.example/api/auth/callback/library",
         AUTH_SESSION_SECRET: "abcdef0123456789abcdef0123456789",
@@ -46,8 +54,8 @@ describe("AuthConfig", () => {
     expect(() =>
       AuthConfig.load({
         NODE_ENV: "production",
-        AUTH_ISSUER: "http://localhost:8081",
-        AUTH_CLIENT_ID: "nextjs",
+        AUTH_ISSUER: "http://localhost:8000",
+        AUTH_CLIENT_ID: "member-nextjs-web",
         AUTH_CLIENT_SECRET: "0123456789abcdef0123456789abcdef",
         AUTH_REDIRECT_URI: "http://localhost:3000/api/auth/callback/library",
         AUTH_SESSION_SECRET: "abcdef0123456789abcdef0123456789",

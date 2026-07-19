@@ -8,7 +8,7 @@ import { GET as callback } from "./callback/library/route";
 import { GET as startLogin } from "./login/route";
 
 const appOrigin = "http://localhost:3000";
-const authOrigin = "http://localhost:8081";
+const authOrigin = "http://localhost:8000";
 const sessionSecret = "abcdef0123456789abcdef0123456789";
 
 function callbackRequest(query: string, flow?: OAuthFlow) {
@@ -28,7 +28,7 @@ function tokenResponse() {
     refresh_token: "refresh-token",
     token_type: "Bearer",
     expires_in: 900,
-    scope: "library:read library:write",
+    scope: "books:read loans:borrow:self",
   });
 }
 
@@ -41,7 +41,7 @@ describe("OAuth login routes", () => {
 
   beforeEach(() => {
     vi.stubEnv("AUTH_ISSUER", authOrigin);
-    vi.stubEnv("AUTH_CLIENT_ID", "nextjs");
+    vi.stubEnv("AUTH_CLIENT_ID", "member-nextjs-web");
     vi.stubEnv("AUTH_CLIENT_SECRET", "0123456789abcdef0123456789abcdef");
     vi.stubEnv("AUTH_REDIRECT_URI", `${appOrigin}/api/auth/callback/library`);
     vi.stubEnv("AUTH_SESSION_SECRET", sessionSecret);

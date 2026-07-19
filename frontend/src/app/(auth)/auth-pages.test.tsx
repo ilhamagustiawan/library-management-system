@@ -18,8 +18,8 @@ function renderPage(page: React.ReactNode) {
 
 describe("authentication pages", () => {
   beforeEach(() => {
-    vi.stubEnv("AUTH_ISSUER", "http://localhost:8081");
-    vi.stubEnv("AUTH_CLIENT_ID", "nextjs");
+    vi.stubEnv("AUTH_ISSUER", "http://localhost:8000");
+    vi.stubEnv("AUTH_CLIENT_ID", "member-nextjs-web");
     vi.stubEnv("AUTH_CLIENT_SECRET", "0123456789abcdef0123456789abcdef");
     vi.stubEnv("AUTH_REDIRECT_URI", "http://localhost:3000/api/auth/callback/library");
     vi.stubEnv("AUTH_SESSION_SECRET", "abcdef0123456789abcdef0123456789");
@@ -28,7 +28,7 @@ describe("authentication pages", () => {
   it("uses the login title as the page heading", async () => {
     const page = await LoginPage({
       searchParams: Promise.resolve({
-        return_to: "http://localhost:8081/oauth/authorize?client_id=nextjs",
+        return_to: "http://localhost:8000/oauth/authorize?client_id=member-nextjs-web",
       }),
     });
     renderPage(page);

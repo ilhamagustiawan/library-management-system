@@ -5,7 +5,7 @@ import { AuthApi } from "./auth-api";
 describe("AuthApi.login", () => {
   it("sends credentials directly to the auth service with cookies enabled", async () => {
     const fetcher: typeof fetch = async (input, init) => {
-      expect(String(input)).toBe("http://localhost:8081/api/v1/auth/login");
+      expect(String(input)).toBe("http://localhost:8000/api/v1/auth/login");
       expect(init?.credentials).toBe("include");
       expect(init?.body).toBe(JSON.stringify({ email: "maya@libry.test", password: "quietreading" }));
       return Response.json({
@@ -16,7 +16,7 @@ describe("AuthApi.login", () => {
 
     await expect(
       AuthApi.login(
-        "http://localhost:8081/api/v1/auth/login",
+        "http://localhost:8000/api/v1/auth/login",
         { email: "maya@libry.test", password: "quietreading" },
         fetcher,
       ),
@@ -32,7 +32,7 @@ describe("AuthApi.login", () => {
 
     await expect(
       AuthApi.login(
-        "http://localhost:8081/api/v1/auth/login",
+        "http://localhost:8000/api/v1/auth/login",
         { email: "maya@libry.test", password: "wrong-password" },
         fetcher,
       ),
@@ -46,7 +46,7 @@ describe("AuthApi.login", () => {
 describe("AuthApi.register", () => {
   it("creates the account without sending form-only fields", async () => {
     const fetcher: typeof fetch = async (input, init) => {
-      expect(String(input)).toBe("http://localhost:8081/api/v1/auth/register");
+      expect(String(input)).toBe("http://localhost:8000/api/v1/users");
       expect(init?.credentials).toBe("include");
       expect(init?.body).toBe(
         JSON.stringify({ name: "Maya Chen", email: "maya@libry.test", password: "quietreading" }),
@@ -62,7 +62,7 @@ describe("AuthApi.register", () => {
 
     await expect(
       AuthApi.register(
-        "http://localhost:8081/api/v1/auth/register",
+        "http://localhost:8000/api/v1/users",
         {
           name: "Maya Chen",
           email: "maya@libry.test",
@@ -79,14 +79,14 @@ describe("AuthApi.register", () => {
 describe("AuthApi.logout", () => {
   it("terminates the browser auth-service session", async () => {
     const fetcher: typeof fetch = async (input, init) => {
-      expect(String(input)).toBe("http://localhost:8081/api/v1/auth/logout");
+      expect(String(input)).toBe("http://localhost:8000/api/v1/auth/logout");
       expect(init?.method).toBe("POST");
       expect(init?.credentials).toBe("include");
       return new Response(null, { status: 204 });
     };
 
     await expect(
-      AuthApi.logout("http://localhost:8081/api/v1/auth/logout", fetcher),
+      AuthApi.logout("http://localhost:8000/api/v1/auth/logout", fetcher),
     ).resolves.toEqual({ status: "success" });
   });
 
@@ -96,7 +96,7 @@ describe("AuthApi.logout", () => {
     };
 
     await expect(
-      AuthApi.logout("http://localhost:8081/api/v1/auth/logout", fetcher),
+      AuthApi.logout("http://localhost:8000/api/v1/auth/logout", fetcher),
     ).resolves.toEqual({
       status: "error",
       message: "Could not reach authentication service. You remain signed in; try again.",

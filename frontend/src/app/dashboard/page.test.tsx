@@ -30,8 +30,8 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     next.cookieValue = undefined;
     next.redirect.mockClear();
-    vi.stubEnv("AUTH_ISSUER", "http://localhost:8081");
-    vi.stubEnv("AUTH_CLIENT_ID", "nextjs");
+    vi.stubEnv("AUTH_ISSUER", "http://localhost:8000");
+    vi.stubEnv("AUTH_CLIENT_ID", "member-nextjs-web");
     vi.stubEnv("AUTH_CLIENT_SECRET", "0123456789abcdef0123456789abcdef");
     vi.stubEnv("AUTH_REDIRECT_URI", "http://localhost:3000/api/auth/callback/library");
     vi.stubEnv("AUTH_SESSION_SECRET", sessionSecret);
@@ -48,7 +48,7 @@ describe("DashboardPage", () => {
         accessToken: "access-token",
         refreshToken: "refresh-token",
         tokenType: "Bearer",
-        scope: "library:read library:write",
+        scope: "books:read loans:borrow:self",
         expiresAt: 1,
       },
       sessionSecret,

@@ -6,12 +6,12 @@ describe("OAuthNavigation", () => {
   it("accepts only the configured authorization endpoint as login return target", () => {
     expect(
       OAuthNavigation.isAuthorizeReturnTo(
-        "http://localhost:8081/oauth/authorize?client_id=nextjs",
-        "http://localhost:8081",
+        "http://localhost:8000/oauth/authorize?client_id=member-nextjs-web",
+        "http://localhost:8000",
       ),
     ).toBe(true);
     expect(
-      OAuthNavigation.isAuthorizeReturnTo("https://attacker.test/oauth/authorize", "http://localhost:8081"),
+      OAuthNavigation.isAuthorizeReturnTo("https://attacker.test/oauth/authorize", "http://localhost:8000"),
     ).toBe(false);
   });
 });

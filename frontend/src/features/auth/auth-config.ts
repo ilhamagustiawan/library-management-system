@@ -5,10 +5,13 @@ import type { OAuthConfig } from "./oauth-client";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   AUTH_ISSUER: z.url(),
+  USER_SERVICE_URL: z.url().default("http://localhost:8000"),
   AUTH_CLIENT_ID: z.string().min(1),
   AUTH_CLIENT_SECRET: z.string().min(32).max(72),
   AUTH_REDIRECT_URI: z.url(),
-  AUTH_SCOPES: z.string().default("library:read library:write"),
+  AUTH_SCOPES: z
+    .string()
+    .default("loans:borrow:self loans:return:self transactions:read:self books:read"),
   AUTH_SESSION_SECRET: z.string().min(32),
 });
 
@@ -39,14 +42,19 @@ function load(environment: Record<string, string | undefined> = process.env): Au
   }
 
   const issuer = new URL(result.data.AUTH_ISSUER);
+  const userService = new URL(result.data.USER_SERVICE_URL);
   const redirect = new URL(result.data.AUTH_REDIRECT_URI);
   if (issuer.pathname !== "/" || issuer.search !== "" || issuer.hash !== "") {
     throw new Error("Invalid auth configuration: AUTH_ISSUER must be an origin");
+  }
+  if (userService.pathname !== "/" || userService.search !== "" || userService.hash !== "") {
+    throw new Error("Invalid auth configuration: USER_SERVICE_URL must be an origin");
   }
   if (redirect.hash !== "") {
     throw new Error("Invalid auth configuration: AUTH_REDIRECT_URI must not contain a fragment");
   }
   validateTransport(issuer, "AUTH_ISSUER", result.data.NODE_ENV);
+  validateTransport(userService, "USER_SERVICE_URL", result.data.NODE_ENV);
   validateTransport(redirect, "AUTH_REDIRECT_URI", result.data.NODE_ENV);
   const scopes = result.data.AUTH_SCOPES.split(/\s+/).filter(Boolean);
   if (scopes.length === 0) {
@@ -65,7 +73,7 @@ function load(environment: Record<string, string | undefined> = process.env): Au
     secureCookies: redirect.protocol === "https:",
     loginEndpoint: new URL("/api/v1/auth/login", issuer).toString(),
     logoutEndpoint: new URL("/api/v1/auth/logout", issuer).toString(),
-    registerEndpoint: new URL("/api/v1/auth/register", issuer).toString(),
+    registerEndpoint: new URL("/api/v1/users", userService).toString(),
   };
 }
 

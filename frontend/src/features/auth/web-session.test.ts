@@ -8,7 +8,7 @@ const session: WebSession = {
   accessToken: "access-token",
   refreshToken: "refresh-token",
   tokenType: "Bearer",
-  scope: "library:read library:write",
+  scope: "books:read loans:borrow:self",
   expiresAt: 2_000,
 };
 

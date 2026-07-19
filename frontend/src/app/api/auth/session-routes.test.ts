@@ -16,7 +16,7 @@ function session(overrides: Partial<WebSessionValue> = {}) {
       accessToken: "access-token",
       refreshToken: "refresh-token",
       tokenType: "Bearer",
-      scope: "library:read library:write",
+      scope: "books:read loans:borrow:self",
       expiresAt: Math.floor(Date.now() / 1_000) + 10,
       ...overrides,
     },
@@ -38,14 +38,14 @@ function refreshedTokenResponse() {
     refresh_token: "new-refresh-token",
     token_type: "Bearer",
     expires_in: 900,
-    scope: "library:read library:write",
+    scope: "books:read loans:borrow:self",
   });
 }
 
 describe("session routes", () => {
   beforeEach(() => {
-    vi.stubEnv("AUTH_ISSUER", "http://localhost:8081");
-    vi.stubEnv("AUTH_CLIENT_ID", "nextjs");
+    vi.stubEnv("AUTH_ISSUER", "http://localhost:8000");
+    vi.stubEnv("AUTH_CLIENT_ID", "member-nextjs-web");
     vi.stubEnv("AUTH_CLIENT_SECRET", "0123456789abcdef0123456789abcdef");
     vi.stubEnv("AUTH_REDIRECT_URI", `${appOrigin}/api/auth/callback/library`);
     vi.stubEnv("AUTH_SESSION_SECRET", sessionSecret);
