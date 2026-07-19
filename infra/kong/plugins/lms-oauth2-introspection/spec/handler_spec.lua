@@ -49,8 +49,10 @@ local config = {
   client_id = "kong-gateway",
   client_secret = "gateway-secret",
   expected_issuer = "http://auth-service",
-  required_scopes = { "library:read" },
+  expected_audience = "library-api",
+  required_scopes = { "books:read" },
   require_subject = true,
+  require_role = true,
   timeout = 2000,
 }
 
@@ -84,7 +86,7 @@ reset()
 request_header = "Bearer opaque-token"
 next_response = {
   status = 200,
-  body = [[{"active":true,"client_id":"nextjs","scope":"library:read library:write","sub":"user-123","token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
+  body = [[{"active":true,"client_id":"nextjs","scope":"books:read loans:borrow:self","sub":"user-123","role":"member","aud":["library-api"],"token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
 }
 handler:access(config)
 assert_equal(nil, exit_response, "active token exit")
@@ -92,15 +94,18 @@ assert_equal("Basic encoded-basic", request_options.headers["Authorization"], "i
 assert_equal("encoded-form", request_options.body, "introspection form body")
 assert_equal(true, cleared_headers["authorization"], "bearer removed")
 assert_equal(true, cleared_headers["X-Credential-Client-ID"], "spoofed client header removed")
+assert_equal(true, cleared_headers["X-Credential-Role"], "spoofed role header removed")
 assert_equal("nextjs", upstream_headers["X-Credential-Client-ID"], "client header")
 assert_equal("user-123", upstream_headers["X-Credential-Sub"], "subject header")
-assert_equal("library:read library:write", upstream_headers["X-Credential-Scope"], "scope header")
+assert_equal("member", upstream_headers["X-Credential-Role"], "role header")
+assert_equal("library-api", upstream_headers["X-Credential-Audience"], "audience header")
+assert_equal("books:read loans:borrow:self", upstream_headers["X-Credential-Scope"], "scope header")
 
 reset()
 request_header = "Bearer opaque-token"
 next_response = {
   status = 200,
-  body = [[{"active":true,"client_id":"nextjs","scope":"library:read","token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
+  body = [[{"active":true,"client_id":"nextjs","scope":"books:read","role":"member","aud":["library-api"],"token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
 }
 handler:access(config)
 assert_equal(403, exit_response.status, "subjectless token status")
@@ -109,12 +114,12 @@ reset()
 request_header = "Bearer opaque-token"
 next_response = {
   status = 200,
-  body = [[{"active":true,"client_id":"nextjs","scope":"library:write","sub":"user-123","token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
+  body = [[{"active":true,"client_id":"nextjs","scope":"loans:borrow:self","sub":"user-123","role":"member","aud":["library-api"],"token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
 }
 handler:access(config)
 assert_equal(403, exit_response.status, "insufficient scope status")
 assert_equal(
-  'Bearer realm="library-api", error="insufficient_scope", scope="library:read"',
+  'Bearer realm="library-api", error="insufficient_scope", scope="books:read"',
   exit_response.headers["WWW-Authenticate"],
   "insufficient scope challenge"
 )
@@ -123,7 +128,7 @@ reset()
 request_header = "Bearer opaque-token"
 next_response = {
   status = 200,
-  body = [[{"active":true,"client_id":"nextjs","scope":"library:read","sub":"user-123","token_type":"Bearer","iat":1,"exp":200,"iss":"http://wrong-issuer"}]],
+  body = [[{"active":true,"client_id":"nextjs","scope":"books:read","sub":"user-123","role":"member","aud":["library-api"],"token_type":"Bearer","iat":1,"exp":200,"iss":"http://wrong-issuer"}]],
 }
 handler:access(config)
 assert_equal(503, exit_response.status, "unexpected issuer status")
@@ -132,10 +137,28 @@ reset()
 request_header = "Bearer opaque-token"
 next_response = {
   status = 200,
-  body = [[{"active":true,"client_id":"nextjs","scope":"library:read","sub":"user-123","token_type":"Bearer","iat":1,"exp":99,"iss":"http://auth-service"}]],
+  body = [[{"active":true,"client_id":"nextjs","scope":"books:read","sub":"user-123","role":"member","aud":["library-api"],"token_type":"Bearer","iat":1,"exp":99,"iss":"http://auth-service"}]],
 }
 handler:access(config)
 assert_equal(401, exit_response.status, "expired token status")
+
+reset()
+request_header = "Bearer opaque-token"
+next_response = {
+  status = 200,
+  body = [[{"active":true,"client_id":"nextjs","scope":"books:read","sub":"user-123","role":"member","aud":["book-service"],"token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
+}
+handler:access(config)
+assert_equal(401, exit_response.status, "wrong audience status")
+
+reset()
+request_header = "Bearer opaque-token"
+next_response = {
+  status = 200,
+  body = [[{"active":true,"client_id":"nextjs","scope":"books:read","sub":"user-123","aud":["library-api"],"token_type":"Bearer","iat":1,"exp":200,"iss":"http://auth-service"}]],
+}
+handler:access(config)
+assert_equal(403, exit_response.status, "missing role status")
 
 reset()
 request_header = "Bearer opaque-token"

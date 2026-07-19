@@ -58,31 +58,18 @@ services:
           - http
         methods:
           - OPTIONS
-        strip_path: true
+        strip_path: false
         preserve_host: false
         path_handling: v0
-      - name: user-service-read-route
+      - name: user-registration-route
         paths:
-          - '~/api/v1/users(?:/|$)'
-        protocols:
-          - http
-        methods:
-          - GET
-          - HEAD
-        strip_path: true
-        preserve_host: false
-        path_handling: v0
-      - name: user-service-write-route
-        paths:
-          - '~/api/v1/users(?:/|$)'
+          - '~/api/v1/users/?$'
         protocols:
           - http
         methods:
           - POST
-          - PUT
-          - PATCH
-          - DELETE
-        strip_path: true
+        regex_priority: 100
+        strip_path: false
         preserve_host: false
         path_handling: v0
 
@@ -111,7 +98,7 @@ services:
           - http
         methods:
           - OPTIONS
-        strip_path: true
+        strip_path: false
         preserve_host: false
         path_handling: v0
       - name: book-service-read-route
@@ -122,7 +109,7 @@ services:
         methods:
           - GET
           - HEAD
-        strip_path: true
+        strip_path: false
         preserve_host: false
         path_handling: v0
       - name: book-service-write-route
@@ -135,7 +122,7 @@ services:
           - PUT
           - PATCH
           - DELETE
-        strip_path: true
+        strip_path: false
         preserve_host: false
         path_handling: v0
 
@@ -164,67 +151,86 @@ services:
           - http
         methods:
           - OPTIONS
-        strip_path: true
+        strip_path: false
         preserve_host: false
         path_handling: v0
-      - name: transaction-service-read-route
+      - name: member-transactions-route
         paths:
-          - '~/api/v1/transactions(?:/|$)'
+          - '~/api/v1/transactions/me/?$'
         protocols:
           - http
         methods:
           - GET
           - HEAD
-        strip_path: true
+        strip_path: false
         preserve_host: false
         path_handling: v0
-      - name: transaction-service-write-route
+      - name: member-borrow-route
         paths:
-          - '~/api/v1/transactions(?:/|$)'
+          - '~/api/v1/transactions/loans/?$'
         protocols:
           - http
         methods:
           - POST
+        strip_path: false
+        preserve_host: false
+        path_handling: v0
+      - name: member-return-route
+        paths:
+          - '~/api/v1/transactions/loans/[^/]+/return/?$'
+        protocols:
+          - http
+        methods:
+          - POST
+        strip_path: false
+        preserve_host: false
+        path_handling: v0
+      - name: admin-transactions-route
+        paths:
+          - '~/api/v1/transactions/admin/?$'
+        protocols:
+          - http
+        methods:
+          - GET
+          - HEAD
+        strip_path: false
+        preserve_host: false
+        path_handling: v0
+      - name: admin-return-route
+        paths:
+          - '~/api/v1/transactions/admin/loans/[^/]+/return/?$'
+        protocols:
+          - http
+        methods:
+          - POST
+        strip_path: false
+        preserve_host: false
+        path_handling: v0
+      - name: admin-fines-route
+        paths:
+          - '~/api/v1/transactions/admin/fines(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - GET
+          - POST
           - PUT
           - PATCH
-          - DELETE
-        strip_path: true
+        strip_path: false
         preserve_host: false
         path_handling: v0
 
 plugins:
-  - name: lms-oauth2-introspection
-    route: user-service-read-route
-    config:
-      introspection_url: http://auth-service:8081/oauth/introspect
-      client_id: kong-gateway
-      client_secret: '{vault://env/lms-introspection-client-secret}'
-      expected_issuer: http://localhost:8081
-      required_scopes:
-        - library:read
-      require_subject: true
-      timeout: 2000
-  - name: lms-oauth2-introspection
-    route: user-service-write-route
-    config:
-      introspection_url: http://auth-service:8081/oauth/introspect
-      client_id: kong-gateway
-      client_secret: '{vault://env/lms-introspection-client-secret}'
-      expected_issuer: http://localhost:8081
-      required_scopes:
-        - library:write
-      require_subject: true
-      timeout: 2000
   - name: lms-oauth2-introspection
     route: book-service-read-route
     config:
       introspection_url: http://auth-service:8081/oauth/introspect
       client_id: kong-gateway
       client_secret: '{vault://env/lms-introspection-client-secret}'
-      expected_issuer: http://localhost:8081
-      required_scopes:
-        - library:read
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
       require_subject: true
+      require_role: true
       timeout: 2000
   - name: lms-oauth2-introspection
     route: book-service-write-route
@@ -232,30 +238,86 @@ plugins:
       introspection_url: http://auth-service:8081/oauth/introspect
       client_id: kong-gateway
       client_secret: '{vault://env/lms-introspection-client-secret}'
-      expected_issuer: http://localhost:8081
-      required_scopes:
-        - library:write
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
       require_subject: true
+      require_role: true
       timeout: 2000
   - name: lms-oauth2-introspection
-    route: transaction-service-read-route
+    route: member-transactions-route
     config:
       introspection_url: http://auth-service:8081/oauth/introspect
       client_id: kong-gateway
       client_secret: '{vault://env/lms-introspection-client-secret}'
-      expected_issuer: http://localhost:8081
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
       required_scopes:
-        - library:read
+        - transactions:read:self
       require_subject: true
+      require_role: true
       timeout: 2000
   - name: lms-oauth2-introspection
-    route: transaction-service-write-route
+    route: member-borrow-route
     config:
       introspection_url: http://auth-service:8081/oauth/introspect
       client_id: kong-gateway
       client_secret: '{vault://env/lms-introspection-client-secret}'
-      expected_issuer: http://localhost:8081
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
       required_scopes:
-        - library:write
+        - loans:borrow:self
       require_subject: true
+      require_role: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: member-return-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
+      required_scopes:
+        - loans:return:self
+      require_subject: true
+      require_role: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: admin-transactions-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
+      required_scopes:
+        - transactions:read:any
+      require_subject: true
+      require_role: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: admin-return-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
+      required_scopes:
+        - loans:return:any
+      require_subject: true
+      require_role: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: admin-fines-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8000
+      expected_audience: library-api
+      required_scopes:
+        - fines:manage
+      require_subject: true
+      require_role: true
       timeout: 2000

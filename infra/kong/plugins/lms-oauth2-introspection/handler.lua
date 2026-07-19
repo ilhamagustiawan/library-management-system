@@ -12,6 +12,8 @@ local credential_headers = {
   "X-Credential-Iat",
   "X-Credential-Exp",
   "X-Credential-Iss",
+  "X-Credential-Audience",
+  "X-Credential-Role",
 }
 
 local Plugin = {
@@ -100,7 +102,19 @@ local function has_required_scopes(required, granted)
   return true
 end
 
-local function forward_identity(response)
+local function has_audience(expected, audiences)
+  if type(audiences) ~= "table" then
+    return false
+  end
+  for _, audience in ipairs(audiences) do
+    if audience == expected then
+      return true
+    end
+  end
+  return false
+end
+
+local function forward_identity(config, response)
   kong.service.request.clear_header("authorization")
   for _, name in ipairs(credential_headers) do
     kong.service.request.clear_header(name)
@@ -111,6 +125,8 @@ local function forward_identity(response)
   set_string_header("X-Credential-Sub", response.sub)
   set_string_header("X-Credential-Token-Type", response.token_type)
   set_string_header("X-Credential-Iss", response.iss)
+  set_string_header("X-Credential-Audience", config.expected_audience)
+  set_string_header("X-Credential-Role", response.role)
   if type(response.iat) == "number" then
     kong.service.request.set_header("X-Credential-Iat", tostring(response.iat))
   end
@@ -151,7 +167,13 @@ function Plugin:access(config)
   if response.exp <= ngx.time() then
     return reject(401)
   end
+  if not has_audience(config.expected_audience, response.aud) then
+    return reject(401, 'Bearer realm="library-api", error="invalid_token"')
+  end
   if config.require_subject and (type(response.sub) ~= "string" or response.sub == "") then
+    return reject(403)
+  end
+  if config.require_role and response.role ~= "member" and response.role ~= "admin" then
     return reject(403)
   end
 
@@ -161,7 +183,7 @@ function Plugin:access(config)
     return reject(403, 'Bearer realm="library-api", error="insufficient_scope", scope="' .. scope .. '"')
   end
 
-  forward_identity(response)
+  forward_identity(config, response)
 end
 
 return Plugin
