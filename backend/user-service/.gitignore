@@ -1,0 +1,11 @@
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+bin/
+/user-service
+/tmp/
+coverage.out
+coverage.html
+.DS_Store

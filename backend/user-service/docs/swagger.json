@@ -1,0 +1,176 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Member registration and profile service.",
+        "title": "Library Management User API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/api/v1/users": {
+            "post": {
+                "description": "Creates a member profile. Role assignment is not accepted.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Register member",
+                "parameters": [
+                    {
+                        "description": "Registration details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.Register"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Member created",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Email already registered",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid registration data",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Registration dependency unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/liveness": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Check liveness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Health"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/readiness": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Check readiness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Health"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/response.Health"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "request.Register": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "example": "ada@example.com"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Ada Lovelace"
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 72,
+                    "minLength": 12,
+                    "example": "correct horse battery staple"
+                }
+            }
+        },
+        "response.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.Health": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data": {}
+            }
+        }
+    }
+}

@@ -1,0 +1,118 @@
+basePath: /
+definitions:
+  request.Register:
+    properties:
+      email:
+        example: ada@example.com
+        maxLength: 254
+        type: string
+      name:
+        example: Ada Lovelace
+        maxLength: 100
+        minLength: 2
+        type: string
+      password:
+        example: correct horse battery staple
+        maxLength: 72
+        minLength: 12
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  response.ErrorResponse:
+    properties:
+      code:
+        type: string
+      data: {}
+      message:
+        type: string
+    type: object
+  response.Health:
+    properties:
+      status:
+        type: string
+    type: object
+  response.SuccessResponse:
+    properties:
+      code:
+        type: string
+      data: {}
+    type: object
+info:
+  contact: {}
+  description: Member registration and profile service.
+  title: Library Management User API
+  version: "1.0"
+paths:
+  /api/v1/users:
+    post:
+      consumes:
+      - application/json
+      description: Creates a member profile. Role assignment is not accepted.
+      parameters:
+      - description: Registration details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.Register'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Member created
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "409":
+          description: Email already registered
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Invalid registration data
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "503":
+          description: Registration dependency unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Register member
+      tags:
+      - Users
+  /health/liveness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Health'
+      summary: Check liveness
+      tags:
+      - Health
+  /health/readiness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Health'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.Health'
+      summary: Check readiness
+      tags:
+      - Health
+schemes:
+- http
+- https
+swagger: "2.0"
