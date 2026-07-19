@@ -1,0 +1,379 @@
+basePath: /
+definitions:
+  entity.Fine:
+    properties:
+      assessedAt:
+        type: string
+      currency:
+        type: string
+      dailyRateMinor:
+        type: integer
+      id:
+        type: string
+      loanId:
+        type: string
+      memberId:
+        type: string
+      overdueDays:
+        type: integer
+      status:
+        $ref: '#/definitions/entity.FineStatus'
+      totalAmountMinor:
+        type: integer
+    type: object
+  entity.FineStatus:
+    enum:
+    - unpaid
+    type: string
+    x-enum-varnames:
+    - FineUnpaid
+  entity.Loan:
+    properties:
+      bookId:
+        type: string
+      borrowedAt:
+        type: string
+      createdAt:
+        type: string
+      dueAt:
+        type: string
+      fine:
+        $ref: '#/definitions/entity.Fine'
+      id:
+        type: string
+      memberId:
+        type: string
+      returnedAt:
+        type: string
+      status:
+        $ref: '#/definitions/entity.LoanStatus'
+      stockSyncStatus:
+        $ref: '#/definitions/entity.StockSyncStatus'
+      updatedAt:
+        type: string
+    type: object
+  entity.LoanStatus:
+    enum:
+    - pending_reservation
+    - active
+    - returned
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - LoanPendingReservation
+    - LoanActive
+    - LoanReturned
+    - LoanCancelled
+  entity.StockSyncStatus:
+    enum:
+    - not_applicable
+    - pending
+    - confirmed
+    type: string
+    x-enum-varnames:
+    - StockSyncNotApplicable
+    - StockSyncPending
+    - StockSyncConfirmed
+  entity.Transaction:
+    properties:
+      bookId:
+        type: string
+      fine:
+        $ref: '#/definitions/entity.Fine'
+      id:
+        type: string
+      loanId:
+        type: string
+      memberId:
+        type: string
+      occurredAt:
+        type: string
+      type:
+        $ref: '#/definitions/entity.TransactionType'
+    type: object
+  entity.TransactionType:
+    enum:
+    - borrow
+    - return
+    type: string
+    x-enum-varnames:
+    - TransactionBorrow
+    - TransactionReturn
+  request.Borrow:
+    properties:
+      bookId:
+        type: string
+    required:
+    - bookId
+    type: object
+  response.ErrorResponse:
+    properties:
+      code:
+        type: string
+      data: {}
+      message:
+        type: string
+    type: object
+  response.LoanSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/entity.Loan'
+    type: object
+  response.PageSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/transaction.Page'
+    type: object
+  transaction.Page:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      totalItems:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: |-
+    Loan, return, fine assessment, and transaction-history service.
+    Kong authenticates human tokens; this service rechecks trusted identity headers and endpoint scopes.
+  title: Library Management Transaction API
+  version: "1.0"
+paths:
+  /api/v1/transactions/admin:
+    get:
+      parameters:
+      - description: Member UUID
+        format: uuid
+        in: query
+        name: memberId
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PageSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all member transactions
+      tags:
+      - Admin transactions
+  /api/v1/transactions/admin/loans/{loanId}/return:
+    post:
+      parameters:
+      - description: Loan UUID
+        format: uuid
+        in: path
+        name: loanId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Book stock update confirmed
+          schema:
+            $ref: '#/definitions/response.LoanSuccess'
+        "202":
+          description: Return committed; stock acknowledgement pending
+          schema:
+            $ref: '#/definitions/response.LoanSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Return any member loan
+      tags:
+      - Admin transactions
+  /api/v1/transactions/loans:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Book to borrow
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.Borrow'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.LoanSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Borrow book
+      tags:
+      - Transactions
+  /api/v1/transactions/loans/{loanId}/return:
+    post:
+      parameters:
+      - description: Loan UUID
+        format: uuid
+        in: path
+        name: loanId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Book stock update confirmed
+          schema:
+            $ref: '#/definitions/response.LoanSuccess'
+        "202":
+          description: Return committed; stock acknowledgement pending
+          schema:
+            $ref: '#/definitions/response.LoanSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Return own loan
+      tags:
+      - Transactions
+  /api/v1/transactions/me:
+    get:
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PageSuccess'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List own transaction history
+      tags:
+      - Transactions
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: Prefix access tokens with "Bearer ".
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
