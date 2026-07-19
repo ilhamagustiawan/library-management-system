@@ -31,9 +31,10 @@ type Client struct {
 }
 
 type reservation struct {
-	TransactionID string `json:"transactionId"`
-	BookID        string `json:"bookId"`
-	Status        string `json:"status"`
+	TransactionID string    `json:"transactionId"`
+	BookID        string    `json:"bookId"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 type successEnvelope struct {
 	Code string      `json:"code"`

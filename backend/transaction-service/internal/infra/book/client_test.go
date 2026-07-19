@@ -37,6 +37,23 @@ func TestReserveCallsAtomicBookEndpoint(t *testing.T) {
 	}
 }
 
+func TestReserveAcceptsBookServiceReservationResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		response.WriteHeader(http.StatusCreated)
+		_, _ = response.Write([]byte(`{"code":"LMS-200000","data":{"transactionId":"loan-1","bookId":"book-1","status":"active","createdAt":"2026-07-19T10:00:00Z"}}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{BaseURL: server.URL}, staticToken("service-token"))
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	if err := client.Reserve(context.Background(), "book-1", "loan-1"); err != nil {
+		t.Fatalf("Reserve() error = %v", err)
+	}
+}
+
 func TestReserveMapsUnavailableStock(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 		response.WriteHeader(http.StatusConflict)
