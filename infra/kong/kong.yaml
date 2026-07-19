@@ -3,7 +3,7 @@ _transform: true
 
 services:
   - name: auth-service
-    url: http://host.docker.internal:8080
+    url: http://auth-service:8081/api/v1/auth
     retries: 1
     connect_timeout: 5000
     read_timeout: 60000
@@ -11,9 +11,203 @@ services:
     routes:
       - name: auth-route
         paths:
-          - '~/api/auth(?:/|$)'
+          - '~/api/v1/auth(?:/|$)'
         protocols:
           - http
         strip_path: true
         preserve_host: false
         path_handling: v0
+
+  - name: user-service
+    url: http://user-service:8080
+    retries: 1
+    connect_timeout: 5000
+    read_timeout: 60000
+    write_timeout: 60000
+    routes:
+      - name: user-service-preflight-route
+        paths:
+          - '~/api/v1/users(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - OPTIONS
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+      - name: user-service-read-route
+        paths:
+          - '~/api/v1/users(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - GET
+          - HEAD
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+      - name: user-service-write-route
+        paths:
+          - '~/api/v1/users(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+
+  - name: book-service
+    url: http://book-service:8080
+    retries: 1
+    connect_timeout: 5000
+    read_timeout: 60000
+    write_timeout: 60000
+    routes:
+      - name: book-service-preflight-route
+        paths:
+          - '~/api/v1/books(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - OPTIONS
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+      - name: book-service-read-route
+        paths:
+          - '~/api/v1/books(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - GET
+          - HEAD
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+      - name: book-service-write-route
+        paths:
+          - '~/api/v1/books(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+
+  - name: transaction-service
+    url: http://transaction-service:8080
+    retries: 1
+    connect_timeout: 5000
+    read_timeout: 60000
+    write_timeout: 60000
+    routes:
+      - name: transaction-service-preflight-route
+        paths:
+          - '~/api/v1/transactions(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - OPTIONS
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+      - name: transaction-service-read-route
+        paths:
+          - '~/api/v1/transactions(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - GET
+          - HEAD
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+      - name: transaction-service-write-route
+        paths:
+          - '~/api/v1/transactions(?:/|$)'
+        protocols:
+          - http
+        methods:
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
+
+plugins:
+  - name: lms-oauth2-introspection
+    route: user-service-read-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8081
+      required_scopes:
+        - library:read
+      require_subject: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: user-service-write-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8081
+      required_scopes:
+        - library:write
+      require_subject: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: book-service-read-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8081
+      required_scopes:
+        - library:read
+      require_subject: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: book-service-write-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8081
+      required_scopes:
+        - library:write
+      require_subject: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: transaction-service-read-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8081
+      required_scopes:
+        - library:read
+      require_subject: true
+      timeout: 2000
+  - name: lms-oauth2-introspection
+    route: transaction-service-write-route
+    config:
+      introspection_url: http://auth-service:8081/oauth/introspect
+      client_id: kong-gateway
+      client_secret: '{vault://env/lms-introspection-client-secret}'
+      expected_issuer: http://localhost:8081
+      required_scopes:
+        - library:write
+      require_subject: true
+      timeout: 2000

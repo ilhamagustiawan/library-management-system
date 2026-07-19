@@ -2,7 +2,9 @@ name: library-management-system
 
 services:
   gateway:
-    image: kong:3.9.3
+    build:
+      context: ./infra/kong
+    image: library-management-kong:3.9.3
     environment:
       KONG_ADMIN_LISTEN: "off"
       KONG_ANONYMOUS_REPORTS: "off"
@@ -10,8 +12,11 @@ services:
       KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yaml
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
-    extra_hosts:
-      - host.docker.internal:host-gateway
+      KONG_PLUGINS: bundled,lms-oauth2-introspection
+      LMS_INTROSPECTION_CLIENT_SECRET: ${OAUTH_INTROSPECTION_CLIENT_SECRET:?set OAUTH_INTROSPECTION_CLIENT_SECRET}
+    depends_on:
+      auth-service:
+        condition: service_started
     volumes:
       - ./infra/kong/kong.yaml:/kong/declarative/kong.yaml:ro
     ports:
@@ -23,7 +28,8 @@ services:
       retries: 10
       start_period: 15s
     networks:
-      - gateway
+      gateway:
+        ipv4_address: 172.30.0.2
 
   auth-db:
     image: mysql:8.4.10
@@ -51,8 +57,38 @@ services:
     networks:
       - auth-db
 
+  auth-service:
+    build:
+      context: ./backend/auth-service
+    restart: unless-stopped
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    environment:
+      SERVICE_ENV: development
+      SERVICE_PORT: :8081
+      ALLOWED_ORIGIN: http://localhost:3000
+      DATABASE_DSN: auth:auth_password@tcp(auth-db:3306)/auth?parseTime=true&loc=UTC&charset=utf8mb4
+      DATABASE_MIGRATION_URL: mysql://auth:auth_password@tcp(auth-db:3306)/auth
+      OAUTH_ISSUER: http://localhost:8081
+      LOGIN_URL: http://localhost:3000/login
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-local-development-only-client-secret}
+      OAUTH_INTROSPECTION_CLIENT_ID: kong-gateway
+      OAUTH_INTROSPECTION_CLIENT_SECRET: ${OAUTH_INTROSPECTION_CLIENT_SECRET:?set OAUTH_INTROSPECTION_CLIENT_SECRET}
+      SESSION_COOKIE_SECURE: "false"
+      TRUSTED_PROXIES: 172.30.0.2
+    command: ["/bin/sh", "-c", "/app/auth-service migrate --action up && exec /app/auth-service serve"]
+    ports:
+      - 127.0.0.1:8081:8081
+    networks:
+      - gateway
+      - auth-db
+
 networks:
   gateway:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
   auth-db:
 
 volumes:
