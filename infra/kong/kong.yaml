@@ -1,0 +1,19 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: auth-service
+    url: http://host.docker.internal:8080
+    retries: 1
+    connect_timeout: 5000
+    read_timeout: 60000
+    write_timeout: 60000
+    routes:
+      - name: auth-route
+        paths:
+          - '~/api/auth(?:/|$)'
+        protocols:
+          - http
+        strip_path: true
+        preserve_host: false
+        path_handling: v0
