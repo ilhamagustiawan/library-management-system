@@ -1,0 +1,61 @@
+import { describe, expect, it } from "vitest";
+
+import { LoginInput, RegisterInput } from "./auth-schema";
+
+describe("LoginInput", () => {
+  it("accepts a valid email and password", () => {
+    const result = LoginInput.schema.safeParse({
+      email: "maya@libry.test",
+      password: "quietreading",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an invalid email", () => {
+    const result = LoginInput.schema.safeParse({
+      email: "not-an-email",
+      password: "quietreading",
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("RegisterInput", () => {
+  it("accepts complete matching registration details", () => {
+    const result = RegisterInput.schema.safeParse({
+      name: "Maya Chen",
+      email: "maya@libry.test",
+      password: "quietreading",
+      confirmPassword: "quietreading",
+      acceptsTerms: true,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects mismatched passwords", () => {
+    const result = RegisterInput.schema.safeParse({
+      name: "Maya Chen",
+      email: "maya@libry.test",
+      password: "quietreading",
+      confirmPassword: "differentpassword",
+      acceptsTerms: true,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires terms acceptance", () => {
+    const result = RegisterInput.schema.safeParse({
+      name: "Maya Chen",
+      email: "maya@libry.test",
+      password: "quietreading",
+      confirmPassword: "quietreading",
+      acceptsTerms: false,
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
