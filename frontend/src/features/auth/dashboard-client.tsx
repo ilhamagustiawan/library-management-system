@@ -1,46 +1,18 @@
-"use client";
-
-import { BookMarked, BookOpen, LogOut, Sparkles } from "lucide-react";
+import { BookMarked, BookOpen, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useSyncExternalStore } from "react";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { AuthSession } from "./auth-session";
+import type { OAuthUser } from "./oauth-client";
+import { LogoutForm } from "./logout-form";
 
-function subscribeToStorage(onChange: () => void) {
-  window.addEventListener("storage", onChange);
-  return () => window.removeEventListener("storage", onChange);
-}
-
-function getClientSession() {
-  return AuthSession.read(window.localStorage);
-}
-
-function getServerSession() {
-  return undefined;
-}
-
-export function DashboardClient() {
-  const router = useRouter();
-  const session = useSyncExternalStore(subscribeToStorage, getClientSession, getServerSession);
-
-  useEffect(() => {
-    if (session === null) {
-      router.replace("/login");
-    }
-  }, [router, session]);
-
-  if (session === null || session === undefined) {
-    return (
-      <main className="grid min-h-screen place-items-center px-5" aria-busy="true">
-        <p className="text-sm text-muted-foreground">Checking member access…</p>
-      </main>
-    );
-  }
-
+export function DashboardClient({
+  logoutEndpoint,
+  session,
+}: {
+  logoutEndpoint: string;
+  session: OAuthUser;
+}) {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/70">
@@ -51,17 +23,7 @@ export function DashboardClient() {
             </span>
             Libry
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              AuthSession.clear(window.localStorage);
-              router.replace("/");
-            }}
-          >
-            <LogOut aria-hidden="true" className="size-4" />
-            Log out
-          </Button>
+          <LogoutForm logoutEndpoint={logoutEndpoint} />
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-18">
@@ -80,7 +42,7 @@ export function DashboardClient() {
               <BookMarked aria-hidden="true" className="size-7 opacity-80" strokeWidth={1.6} />
               <CardTitle className="pt-8 text-primary-foreground">Member card</CardTitle>
               <CardDescription className="text-primary-foreground/70">
-                Mock membership · active preview
+                Authenticated membership · active session
               </CardDescription>
             </CardHeader>
             <CardContent>

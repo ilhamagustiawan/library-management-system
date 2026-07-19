@@ -20,6 +20,12 @@ describe("LoginInput", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("accepts an existing account password shorter than registration policy", () => {
+    expect(
+      LoginInput.schema.safeParse({ email: "maya@libry.test", password: "legacy8" }).success,
+    ).toBe(true);
+  });
 });
 
 describe("RegisterInput", () => {
@@ -54,6 +60,18 @@ describe("RegisterInput", () => {
       password: "quietreading",
       confirmPassword: "quietreading",
       acceptsTerms: false,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires twelve characters for new passwords", () => {
+    const result = RegisterInput.schema.safeParse({
+      name: "Maya Chen",
+      email: "maya@libry.test",
+      password: "legacy8",
+      confirmPassword: "legacy8",
+      acceptsTerms: true,
     });
 
     expect(result.success).toBe(false);

@@ -12,14 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { RegisterInput } from "./auth-schema";
-import type { AuthSession } from "./auth-session";
+import { AuthApi } from "./auth-api";
 import { FormError } from "./form-error";
-import { MockAuth } from "./mock-auth";
 
 export function RegisterForm({
-  onAuthenticated,
+  navigate,
+  registerEndpoint,
 }: {
-  onAuthenticated: (session: AuthSession) => void;
+  navigate?: (url: string) => void;
+  registerEndpoint: string;
 }) {
   const form = useForm<RegisterInput>({
     resolver: zodResolver(RegisterInput.schema),
@@ -32,10 +33,11 @@ export function RegisterForm({
     },
   });
   const mutation = useMutation({
-    mutationFn: MockAuth.register,
+    mutationFn: (input: RegisterInput) => AuthApi.register(registerEndpoint, input),
     onSuccess: (result) => {
       if (result.status === "success") {
-        onAuthenticated(result.session);
+        if (navigate !== undefined) navigate("/login");
+        else window.location.assign("/login");
         return;
       }
 
@@ -121,7 +123,7 @@ export function RegisterForm({
                 }
               />
               <Label htmlFor="terms" className="font-normal leading-5 text-muted-foreground">
-                I agree to the member terms and acknowledge this MVP uses mock authentication.
+                I agree to the member terms and privacy policy.
               </Label>
             </div>
             <FormError id="terms-error" message={form.formState.errors.acceptsTerms?.message} />

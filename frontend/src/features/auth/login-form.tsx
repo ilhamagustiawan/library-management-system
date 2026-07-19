@@ -11,24 +11,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { LoginInput } from "./auth-schema";
-import type { AuthSession } from "./auth-session";
+import { AuthApi } from "./auth-api";
 import { FormError } from "./form-error";
-import { MockAuth } from "./mock-auth";
 
 export function LoginForm({
-  onAuthenticated,
+  loginEndpoint,
+  navigate,
+  returnTo,
 }: {
-  onAuthenticated: (session: AuthSession) => void;
+  loginEndpoint: string;
+  navigate?: (url: string) => void;
+  returnTo: string;
 }) {
   const form = useForm<LoginInput>({
     resolver: zodResolver(LoginInput.schema),
     defaultValues: { email: "", password: "" },
   });
   const mutation = useMutation({
-    mutationFn: MockAuth.login,
+    mutationFn: (input: LoginInput) => AuthApi.login(loginEndpoint, input),
     onSuccess: (result) => {
       if (result.status === "success") {
-        onAuthenticated(result.session);
+        if (navigate !== undefined) navigate(returnTo);
+        else window.location.assign(returnTo);
         return;
       }
 
@@ -57,7 +61,6 @@ export function LoginForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Password</Label>
-          <span className="text-xs text-muted-foreground">8+ characters</span>
         </div>
         <Input
           id="password"

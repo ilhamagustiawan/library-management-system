@@ -1,54 +1,26 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
-import { AuthSession } from "./auth-session";
 import { DashboardClient } from "./dashboard-client";
 
-const navigation = vi.hoisted(() => ({
-  replace: vi.fn(),
-}));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => navigation,
-}));
+const session = {
+  id: "user-123",
+  name: "Maya Chen",
+  email: "maya@libry.test",
+};
 
 describe("DashboardClient", () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-    navigation.replace.mockClear();
+  it("greets the authenticated member", () => {
+    render(<DashboardClient logoutEndpoint="http://localhost:8081/api/v1/auth/logout" session={session} />);
+
+    expect(screen.getByRole("heading", { name: /welcome, maya/i })).toBeVisible();
   });
 
-  it("redirects guests to login", async () => {
-    render(<DashboardClient />);
+  it("posts logout through the server session route", () => {
+    render(<DashboardClient logoutEndpoint="http://localhost:8081/api/v1/auth/logout" session={session} />);
 
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith("/login"));
-  });
-
-  it("greets the stored member", async () => {
-    AuthSession.write(window.localStorage, {
-      id: "mock-member",
-      name: "Maya Chen",
-      email: "maya@libry.test",
-    });
-
-    render(<DashboardClient />);
-
-    expect(await screen.findByRole("heading", { name: /welcome, maya/i })).toBeVisible();
-  });
-
-  it("clears the session on logout", async () => {
-    const user = userEvent.setup();
-    AuthSession.write(window.localStorage, {
-      id: "mock-member",
-      name: "Maya Chen",
-      email: "maya@libry.test",
-    });
-    render(<DashboardClient />);
-
-    await user.click(await screen.findByRole("button", { name: "Log out" }));
-
-    expect(AuthSession.read(window.localStorage)).toBeNull();
-    expect(navigation.replace).toHaveBeenCalledWith("/");
+    const form = screen.getByRole("button", { name: "Log out" }).closest("form");
+    expect(form).toHaveAttribute("action", "/api/auth/logout");
+    expect(form).toHaveAttribute("method", "post");
   });
 });

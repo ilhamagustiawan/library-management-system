@@ -1,14 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AuthSession } from "@/features/auth/auth-session";
+import { AuthConfig } from "@/features/auth/auth-config";
 import { RegisterForm } from "@/features/auth/register-form";
 
+export const dynamic = "force-dynamic";
+
 export default function RegisterPage() {
-  const router = useRouter();
+  const config = AuthConfig.load();
 
   return (
     <Card className="bg-card/80 shadow-[6px_7px_0_0_var(--secondary)]">
@@ -21,12 +20,7 @@ export default function RegisterPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <RegisterForm
-          onAuthenticated={(session) => {
-            AuthSession.write(window.localStorage, session);
-            router.replace("/dashboard");
-          }}
-        />
+        <RegisterForm registerEndpoint={config.registerEndpoint} />
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already registered?{" "}
           <Link className="font-semibold text-foreground underline-offset-4 hover:underline" href="/login">
