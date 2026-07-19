@@ -1,0 +1,22 @@
+# Authorization RBAC Tasks
+
+- [ ] Add `roles`, `scopes`, `role_scopes`; add `users.role_code`.
+- [ ] Seed `member`, `admin`, domain scopes, role mappings.
+- [ ] Add/backfill `oauth_client_scopes`; cut over client policy reads.
+- [ ] Add typed `Role`; load role through user/session repositories.
+- [ ] Add secure, offline admin bootstrap CLI; no role API.
+- [ ] Add User Service public registration endpoint; omit `role` input.
+- [ ] Add idempotent Auth `CreateIdentity`; return canonical user ID.
+- [ ] Add transactional outbox for secret-free `UserRegistered.v1`.
+- [ ] Resolve Authorization Code scopes from role + client + audience.
+- [ ] Reject member request for `transactions:read:any`.
+- [ ] Grant member `books:read`; add paginated catalog policy.
+- [ ] Prove admin receives no borrow scope and cannot borrow.
+- [ ] Provision `user-service` and `transaction-service` clients.
+- [ ] Issue service token with Book audience, no role/refresh token.
+- [ ] Add trusted `role` to user JWT/introspection output.
+- [ ] Replace `library:read`/`library:write` gateway policy.
+- [ ] Enforce member `sub` ownership in Transaction Service.
+- [ ] Add paginated admin all-member transaction endpoint.
+- [ ] Update OAuth metadata, Swagger, seeds, env, docs.
+- [ ] Run Go tests/race/vet/build and Compose authorization smoke tests.
