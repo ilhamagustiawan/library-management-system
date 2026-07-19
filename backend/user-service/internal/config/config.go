@@ -22,11 +22,10 @@ type Config struct {
 }
 
 type ServiceConfig struct {
-	Name           string
-	Environment    string
-	Port           string
-	AllowedOrigin  string
-	TrustedProxies []string
+	Name          string
+	Environment   string
+	Port          string
+	AllowedOrigin string
 }
 
 type DatabaseConfig struct {
@@ -76,7 +75,6 @@ func Load() (Config, error) {
 		Service: ServiceConfig{
 			Name: env("SERVICE_NAME", "library-user-service"), Environment: env("SERVICE_ENV", "development"),
 			Port: env("SERVICE_PORT", ":8082"), AllowedOrigin: env("ALLOWED_ORIGIN", "http://localhost:3000"),
-			TrustedProxies: strings.Fields(os.Getenv("TRUSTED_PROXIES")),
 		},
 		Database: DatabaseConfig{
 			DSN:          env("DATABASE_DSN", "users:users_password@tcp(127.0.0.1:3307)/users?parseTime=true&loc=UTC&charset=utf8mb4"),

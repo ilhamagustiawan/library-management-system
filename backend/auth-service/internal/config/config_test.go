@@ -67,15 +67,3 @@ func TestLoadRejectsEmptySupportedOAuthScopes(t *testing.T) {
 		t.Fatalf("Load() error = %v, want supported-scopes error", err)
 	}
 }
-
-func TestLoadConfiguresTrustedProxies(t *testing.T) {
-	t.Setenv("TRUSTED_PROXIES", "172.30.0.2 10.0.0.0/24")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if len(cfg.Service.TrustedProxies) != 2 || cfg.Service.TrustedProxies[0] != "172.30.0.2" || cfg.Service.TrustedProxies[1] != "10.0.0.0/24" {
-		t.Fatalf("Service.TrustedProxies = %#v, want normalized proxy list", cfg.Service.TrustedProxies)
-	}
-}

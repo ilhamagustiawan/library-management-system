@@ -124,8 +124,6 @@ func fiberConfig(cfg config.Config) fiber.Config {
 	return fiber.Config{
 		AppName: cfg.Service.Name, BodyLimit: 1 << 20, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second,
 		IdleTimeout: 60 * time.Second, DisableStartupMessage: false, ErrorHandler: helper.ErrorHandler,
-		ProxyHeader: "X-Real-IP", EnableIPValidation: true, EnableTrustedProxyCheck: true,
-		TrustedProxies: cfg.Service.TrustedProxies,
 	}
 }
 
