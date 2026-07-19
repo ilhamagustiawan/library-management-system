@@ -17,9 +17,12 @@ import (
 	"github.com/go-oauth2/oauth2/v4/manage"
 	"github.com/go-oauth2/oauth2/v4/models"
 	"github.com/go-oauth2/oauth2/v4/store"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/domain/entity"
 )
+
+var testJWTSigningKey = []byte("test-signing-key-with-at-least-32-bytes")
 
 type fakeSessions struct{}
 
@@ -27,15 +30,24 @@ func (fakeSessions) AuthenticateSession(_ context.Context, token string) (*entit
 	if token != "valid-session" {
 		return nil, context.Canceled
 	}
-	return &entity.User{ID: "user-123"}, nil
+	return &entity.User{ID: "user-123", Role: entity.RoleMember}, nil
+}
+func (fakeSessions) FindUser(_ context.Context, id string) (*entity.User, error) {
+	return &entity.User{ID: id, Role: entity.RoleMember}, nil
 }
 
 type allowScopes struct {
 	grants        map[string]map[oauth2lib.GrantType]bool
 	introspectors map[string]bool
+	scopes        []string
 }
 
-func (allowScopes) AllowsScopes(context.Context, string, string) (bool, error) { return true, nil }
+func (p allowScopes) GetScopes(_ context.Context, _ string) ([]entity.Scope, error) {
+	return testScopes(p.scopes), nil
+}
+func (p allowScopes) GetRoleScopes(_ context.Context, _ entity.Role) ([]entity.Scope, error) {
+	return testScopes(p.scopes), nil
+}
 func (p allowScopes) AllowsGrant(_ context.Context, clientID string, grant oauth2lib.GrantType) (bool, error) {
 	return p.grants[clientID][grant], nil
 }
@@ -88,6 +100,25 @@ func TestAuthorizationServerRequiresS256PKCEAndExactRedirect(t *testing.T) {
 	}
 }
 
+func TestAuthorizationServerReportsInvalidScope(t *testing.T) {
+	authServer := newTestServer(t)
+	query := authorizeQuery("http://client.example/callback", s256(strings.Repeat("a", 64)))
+	query.Set("scope", "transactions:read:any")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil)
+	request.AddCookie(&http.Cookie{Name: "lms_session", Value: "valid-session"})
+
+	authServer.AuthorizeHandler().ServeHTTP(recorder, request)
+
+	var response OAuthErrorResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode error response: %v; body=%s", err, recorder.Body.String())
+	}
+	if recorder.Code != http.StatusBadRequest || response.Error != "invalid_scope" {
+		t.Fatalf("status = %d, error = %q, want 400 invalid_scope", recorder.Code, response.Error)
+	}
+}
+
 func TestAuthorizationServerCompletesCodeExchangeWithPKCE(t *testing.T) {
 	authServer := newTestServer(t)
 	verifier := strings.Repeat("a", 64)
@@ -133,6 +164,17 @@ func TestAuthorizationServerCompletesCodeExchangeWithPKCE(t *testing.T) {
 	if tokenResponse["access_token"] == "" || !ok || refreshToken == "" {
 		t.Fatalf("token response = %#v, want access and refresh tokens", tokenResponse)
 	}
+	accessToken, ok := tokenResponse["access_token"].(string)
+	if !ok {
+		t.Fatalf("access_token = %#v, want string", tokenResponse["access_token"])
+	}
+	claims := &AccessTokenClaims{}
+	parsed, err := jwt.ParseWithClaims(accessToken, claims, func(*jwt.Token) (any, error) {
+		return testJWTSigningKey, nil
+	}, jwt.WithAudience("library-api"), jwt.WithIssuer("http://auth.example"))
+	if err != nil || parsed == nil || !parsed.Valid || claims.Subject != "user-123" || claims.ClientID != "nextjs" {
+		t.Fatalf("access token claims = %#v, token = %#v, error = %v", claims, parsed, err)
+	}
 
 	refreshForm := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}}
 	refreshRecorder := httptest.NewRecorder()
@@ -162,7 +204,7 @@ func TestAuthorizationServerMetadataUsesConfiguredScopes(t *testing.T) {
 
 func TestAuthorizationServerIssuesClientCredentialsWithoutRefreshToken(t *testing.T) {
 	authServer := newTestServer(t)
-	form := url.Values{"grant_type": {"client_credentials"}, "scope": {"library:read"}}
+	form := url.Values{"grant_type": {"client_credentials"}, "scope": {"books:read"}}
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader(form.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -187,7 +229,7 @@ func TestAuthorizationServerIssuesClientCredentialsWithoutRefreshToken(t *testin
 
 func TestAuthorizationServerRejectsClientCredentialsForAuthorizationCodeClient(t *testing.T) {
 	authServer := newTestServer(t)
-	form := url.Values{"grant_type": {"client_credentials"}, "scope": {"library:read"}}
+	form := url.Values{"grant_type": {"client_credentials"}, "scope": {"books:read"}}
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader(form.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -200,7 +242,24 @@ func TestAuthorizationServerRejectsClientCredentialsForAuthorizationCodeClient(t
 	}
 }
 
-func TestIntrospectionReturnsActiveClientTokenWithoutUserSubject(t *testing.T) {
+func TestAuthenticateServiceTokenChecksClientAudienceAndScope(t *testing.T) {
+	authServer := newTestServer(t)
+	token := issueClientCredentialsToken(t, authServer)
+	if err := authServer.AuthenticateServiceToken(context.Background(), token, "machine-client", "library-api", "books:read"); err != nil {
+		t.Fatalf("AuthenticateServiceToken() error = %v", err)
+	}
+	for _, test := range []struct{ clientID, audience, scope string }{
+		{clientID: "other-client", audience: "library-api", scope: "books:read"},
+		{clientID: "machine-client", audience: "auth-service", scope: "books:read"},
+		{clientID: "machine-client", audience: "library-api", scope: "books:manage"},
+	} {
+		if err := authServer.AuthenticateServiceToken(context.Background(), token, test.clientID, test.audience, test.scope); err == nil {
+			t.Fatalf("AuthenticateServiceToken(%#v) error = nil", test)
+		}
+	}
+}
+
+func TestIntrospectionReturnsActiveServiceIdentity(t *testing.T) {
 	authServer := newTestServer(t)
 	accessToken := issueClientCredentialsToken(t, authServer)
 	form := url.Values{"token": {accessToken}, "token_type_hint": {"access_token"}}
@@ -218,13 +277,13 @@ func TestIntrospectionReturnsActiveClientTokenWithoutUserSubject(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode introspection response: %v", err)
 	}
-	if response["active"] != true || response["client_id"] != "machine-client" || response["scope"] != "library:read" {
+	if response["active"] != true || response["client_id"] != "machine-client" || response["scope"] != "books:read" || response["sub"] != "machine-client" {
 		t.Fatalf("introspection response = %#v, want active machine token", response)
 	}
-	if _, exists := response["sub"]; exists {
-		t.Fatalf("introspection response = %#v, machine token must not have user subject", response)
+	if _, exists := response["role"]; exists {
+		t.Fatalf("introspection response = %#v, machine token must omit role", response)
 	}
-	for _, field := range []string{"token_type", "iat", "exp", "iss"} {
+	for _, field := range []string{"token_type", "iat", "exp", "iss", "aud"} {
 		if _, exists := response[field]; !exists {
 			t.Fatalf("introspection response = %#v, missing %s", response, field)
 		}
@@ -248,7 +307,7 @@ func TestIntrospectionReturnsOnlyInactiveForUnknownToken(t *testing.T) {
 
 func TestIntrospectionReturnsUserSubjectForAuthorizationCodeToken(t *testing.T) {
 	authServer := newTestServer(t)
-	accessToken := issueAuthorizationCodeToken(t, authServer)
+	accessToken := issueAuthorizationCodeTokens(t, authServer).AccessToken
 	form := url.Values{"token": {accessToken}}
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/oauth/introspect", strings.NewReader(form.Encode()))
@@ -261,8 +320,37 @@ func TestIntrospectionReturnsUserSubjectForAuthorizationCodeToken(t *testing.T) 
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode introspection response: %v", err)
 	}
-	if recorder.Code != http.StatusOK || response["active"] != true || response["sub"] != "user-123" {
+	if recorder.Code != http.StatusOK || response["active"] != true || response["sub"] != "user-123" || response["role"] != "member" {
 		t.Fatalf("introspection = %d %#v, want active user subject", recorder.Code, response)
+	}
+	if audiences, ok := response["aud"].([]any); !ok || len(audiences) != 1 || audiences[0] != "library-api" {
+		t.Fatalf("introspection audience = %#v", response["aud"])
+	}
+}
+
+func TestRefreshRotationInvalidatesPreviousJWTAccessToken(t *testing.T) {
+	authServer := newTestServer(t)
+	issued := issueAuthorizationCodeTokens(t, authServer)
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {issued.RefreshToken}}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.SetBasicAuth("nextjs", "client-secret")
+
+	authServer.TokenHandler().ServeHTTP(recorder, request)
+
+	var refreshed oauthTokenPair
+	if err := json.Unmarshal(recorder.Body.Bytes(), &refreshed); err != nil || recorder.Code != http.StatusOK {
+		t.Fatalf("refresh token: status=%d error=%v body=%s", recorder.Code, err, recorder.Body.String())
+	}
+	if refreshed.AccessToken == "" || refreshed.AccessToken == issued.AccessToken || refreshed.RefreshToken == "" || refreshed.RefreshToken == issued.RefreshToken {
+		t.Fatalf("refreshed tokens = %#v, want rotated access and refresh tokens", refreshed)
+	}
+	if _, err := authServer.LoadAccessToken(context.Background(), issued.AccessToken); err == nil {
+		t.Fatal("previous access token remains active after refresh rotation")
+	}
+	if _, err := authServer.LoadAccessToken(context.Background(), refreshed.AccessToken); err != nil {
+		t.Fatalf("refreshed access token is inactive: %v", err)
 	}
 }
 
@@ -304,7 +392,7 @@ func TestIntrospectionRequiresToken(t *testing.T) {
 
 func issueClientCredentialsToken(t *testing.T, authServer *AuthorizationServer) string {
 	t.Helper()
-	form := url.Values{"grant_type": {"client_credentials"}, "scope": {"library:read"}}
+	form := url.Values{"grant_type": {"client_credentials"}, "scope": {"books:read"}}
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader(form.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -322,7 +410,12 @@ func issueClientCredentialsToken(t *testing.T, authServer *AuthorizationServer) 
 	return response.AccessToken
 }
 
-func issueAuthorizationCodeToken(t *testing.T, authServer *AuthorizationServer) string {
+type oauthTokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+func issueAuthorizationCodeTokens(t *testing.T, authServer *AuthorizationServer) oauthTokenPair {
 	t.Helper()
 	verifier := strings.Repeat("a", 64)
 	authorizeRecorder := httptest.NewRecorder()
@@ -347,18 +440,16 @@ func issueAuthorizationCodeToken(t *testing.T, authServer *AuthorizationServer) 
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.SetBasicAuth("nextjs", "client-secret")
 	authServer.TokenHandler().ServeHTTP(recorder, request)
-	var response struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.AccessToken == "" {
+	var response oauthTokenPair
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.AccessToken == "" || response.RefreshToken == "" {
 		t.Fatalf("issue user token: status=%d error=%v body=%s", recorder.Code, err, recorder.Body.String())
 	}
-	return response.AccessToken
+	return response
 }
 
 func newTestServer(t *testing.T) *AuthorizationServer {
 	t.Helper()
-	return newTestServerWithScopes(t, []string{"library:read", "library:write"})
+	return newTestServerWithScopes(t, []string{"books:read", "loans:borrow:self"})
 }
 
 func newTestServerWithScopes(t *testing.T, scopes []string) *AuthorizationServer {
@@ -395,18 +486,37 @@ func newTestServerWithScopes(t *testing.T, scopes []string) *AuthorizationServer
 		"machine-client": {
 			oauth2lib.ClientCredentials: true,
 		},
-	}, introspectors: map[string]bool{"kong-gateway": true}}
+	}, introspectors: map[string]bool{"kong-gateway": true}, scopes: scopes}
 
-	return NewAuthorizationServer(manager, fakeSessions{}, policies, Config{
+	authServer, err := NewAuthorizationServer(manager, fakeSessions{}, policies, Config{
 		Issuer: "http://auth.example", LoginURL: "http://client.example/login", SessionCookieName: "lms_session",
 		CodeTTL: 5 * time.Minute, AccessTokenTTL: 15 * time.Minute, RefreshTokenTTL: 24 * time.Hour, SupportedScopes: scopes,
+		JWTSigningKey: testJWTSigningKey,
 	})
+	if err != nil {
+		t.Fatalf("create authorization server: %v", err)
+	}
+	return authServer
+}
+
+func testScopes(codes []string) []entity.Scope {
+	result := make([]entity.Scope, 0, len(codes))
+	for _, code := range codes {
+		audience := "library-api"
+		if code == "identities:create" {
+			audience = "auth-service"
+		} else if strings.HasPrefix(code, "book-stock:") {
+			audience = "book-service"
+		}
+		result = append(result, entity.Scope{Code: code, Audience: audience})
+	}
+	return result
 }
 
 func authorizeQuery(redirectURI, challenge string) url.Values {
 	query := url.Values{
 		"response_type": {"code"}, "client_id": {"nextjs"}, "redirect_uri": {redirectURI},
-		"scope": {"library:read"}, "state": {"state-123"},
+		"scope": {"books:read"}, "state": {"state-123"},
 	}
 	if challenge != "" {
 		query.Set("code_challenge", challenge)

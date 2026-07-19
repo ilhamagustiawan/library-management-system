@@ -42,7 +42,7 @@ migrate-down:
 	go run . migrate --action down
 
 create-client:
-	go run . create-client --name "$(NAME)" --id "$(ID)" --redirect-uri "$(REDIRECT_URI)" --scopes "$(or $(SCOPES),library:read library:write)"
+	go run . create-client --name "$(NAME)" --id "$(ID)" --kind "$(or $(KIND),authorization_code)" --redirect-uri "$(REDIRECT_URI)" --scopes "$(or $(SCOPES),loans:borrow:self loans:return:self transactions:read:self books:read)"
 
 docker-up:
 	docker compose -f ../../docker-compose.yaml up --build auth-service

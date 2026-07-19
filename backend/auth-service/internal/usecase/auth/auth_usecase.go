@@ -62,7 +62,7 @@ func (u *authUsecase) Register(ctx context.Context, input RegisterInput) (*entit
 	}
 	now := u.now()
 	user := &entity.User{
-		ID: u.newID(), Name: name, Email: email, PasswordHash: passwordHash,
+		ID: u.newID(), Name: name, Email: email, PasswordHash: passwordHash, Role: entity.RoleMember,
 		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := u.users.Create(ctx, user); err != nil {
@@ -126,6 +126,10 @@ func (u *authUsecase) AuthenticateSession(ctx context.Context, token string) (*e
 		return nil, fmt.Errorf("find session user: %w", err)
 	}
 	return user, nil
+}
+
+func (u *authUsecase) FindUser(ctx context.Context, id string) (*entity.User, error) {
+	return u.users.FindByID(ctx, id)
 }
 
 func (u *authUsecase) Logout(ctx context.Context, token string) error {

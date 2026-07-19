@@ -53,6 +53,7 @@ type OAuthConfig struct {
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 	SupportedScopes []string
+	JWTSigningKey   []byte
 }
 
 func loadDotEnv() error {
@@ -88,14 +89,26 @@ func Load() (Config, error) {
 			RateLimitMax:        envInt("AUTH_RATE_LIMIT_MAX", 10), RateLimitWindow: envDuration("AUTH_RATE_LIMIT_WINDOW", 15*time.Minute),
 		},
 		OAuth: OAuthConfig{
-			Issuer: env("OAUTH_ISSUER", "http://localhost:8081"), LoginURL: env("LOGIN_URL", "http://localhost:3000/login"),
+			Issuer: env("OAUTH_ISSUER", "http://localhost:8000"), LoginURL: env("LOGIN_URL", "http://localhost:3000/login"),
 			CodeTTL: envDuration("OAUTH_CODE_TTL", 5*time.Minute), AccessTokenTTL: envDuration("OAUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
 			RefreshTokenTTL: envDuration("OAUTH_REFRESH_TOKEN_TTL", 7*24*time.Hour),
-			SupportedScopes: strings.Fields(env("OAUTH_CLIENT_SCOPES", "library:read library:write")),
+			SupportedScopes: strings.Fields(env("OAUTH_CLIENT_SCOPES", "loans:borrow:self loans:return:self transactions:read:self books:read transactions:read:any loans:return:any fines:manage books:manage identities:create book-stock:read book-stock:reserve book-stock:release")),
+			JWTSigningKey:   []byte(os.Getenv("OAUTH_JWT_SIGNING_KEY")),
 		},
 	}
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
+	}
+	return cfg, nil
+}
+
+func LoadServer() (Config, error) {
+	cfg, err := Load()
+	if err != nil {
+		return Config{}, err
+	}
+	if len(cfg.OAuth.JWTSigningKey) < 32 {
+		return Config{}, fmt.Errorf("OAUTH_JWT_SIGNING_KEY must contain at least 32 bytes")
 	}
 	return cfg, nil
 }

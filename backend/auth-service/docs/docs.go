@@ -187,70 +187,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/register": {
-            "post": {
-                "description": "Creates a user account. Requests from browsers must use the configured trusted Origin.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Authentication"
-                ],
-                "summary": "Register user",
-                "parameters": [
-                    {
-                        "description": "Registration details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.Register"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "User created",
-                        "schema": {
-                            "$ref": "#/definitions/response.UserSuccess"
-                        }
-                    },
-                    "403": {
-                        "description": "Untrusted request origin",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Email already registered",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "422": {
-                        "description": "Invalid registration data",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/oauth/userinfo": {
             "get": {
                 "security": [
@@ -332,6 +268,71 @@ const docTemplate = `{
                         "description": "A required dependency is unavailable",
                         "schema": {
                             "$ref": "#/definitions/response.Health"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/identities": {
+            "post": {
+                "description": "Internal idempotent endpoint. Requires a User Service bearer token with identities:create.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Internal"
+                ],
+                "summary": "Create member identity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable registration command key",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Member identity",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.Register"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Identity created or replayed",
+                        "schema": {
+                            "$ref": "#/definitions/response.UserSuccess"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid service token",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Service scope denied",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Email or idempotency conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid identity data",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -438,7 +439,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Opaque access token",
+                        "description": "JWT access token",
                         "name": "token",
                         "in": "formData",
                         "required": true
@@ -606,6 +607,15 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "aud": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "library-api"
+                    ]
+                },
                 "client_id": {
                     "type": "string",
                     "example": "member-nextjs-web"
@@ -622,9 +632,13 @@ const docTemplate = `{
                     "type": "string",
                     "example": "http://localhost:8081"
                 },
+                "role": {
+                    "type": "string",
+                    "example": "member"
+                },
                 "scope": {
                     "type": "string",
-                    "example": "library:read"
+                    "example": "books:read"
                 },
                 "sub": {
                     "type": "string",
@@ -641,7 +655,7 @@ const docTemplate = `{
             "properties": {
                 "access_token": {
                     "type": "string",
-                    "example": "opaque-access-token"
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsibGlicmFyeS1hcGkiXX0.signature"
                 },
                 "expires_in": {
                     "type": "integer",
@@ -653,7 +667,7 @@ const docTemplate = `{
                 },
                 "scope": {
                     "type": "string",
-                    "example": "library:read library:write"
+                    "example": "books:read loans:borrow:self"
                 },
                 "token_type": {
                     "type": "string",
@@ -784,8 +798,8 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "example": [
-                        "library:read",
-                        "library:write"
+                        "books:read",
+                        "loans:borrow:self"
                     ]
                 },
                 "token_endpoint": {
@@ -821,6 +835,10 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "Ada Lovelace"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "member"
                 },
                 "updatedAt": {
                     "type": "string",
@@ -861,7 +879,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "Library Management Auth API",
-	Description:      "OAuth 2.0 authorization and user authentication service for the library management system.\nThis service uses opaque bearer tokens, Authorization Code with PKCE, and HttpOnly session cookies.",
+	Description:      "OAuth 2.0 authorization and user authentication service for the library management system.\nThis service uses JWT access tokens, Authorization Code with PKCE, and HttpOnly session cookies.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

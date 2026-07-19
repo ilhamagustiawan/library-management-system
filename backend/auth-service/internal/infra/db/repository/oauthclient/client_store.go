@@ -10,6 +10,8 @@ import (
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/domain/entity"
 )
 
 var ErrNotFound = errors.New("oauth client not found")
@@ -23,15 +25,15 @@ const (
 )
 
 type Client struct {
-	ID            string         `db:"id"`
-	Name          string         `db:"name"`
-	Kind          Kind           `db:"kind"`
-	SecretHash    string         `db:"secret_hash"`
-	RedirectURI   string         `db:"redirect_uri"`
-	AllowedScopes string         `db:"allowed_scopes"`
-	Public        bool           `db:"is_public"`
-	UserID        sql.NullString `db:"user_id"`
-	CreatedAt     time.Time      `db:"created_at"`
+	ID          string         `db:"id"`
+	Name        string         `db:"name"`
+	Kind        Kind           `db:"kind"`
+	SecretHash  string         `db:"secret_hash"`
+	RedirectURI string         `db:"redirect_uri"`
+	Scopes      []string       `db:"-"`
+	Public      bool           `db:"is_public"`
+	UserID      sql.NullString `db:"user_id"`
+	CreatedAt   time.Time      `db:"created_at"`
 }
 
 func (c *Client) GetID() string     { return c.ID }
@@ -42,7 +44,7 @@ func (c *Client) GetUserID() string { return c.UserID.String }
 func (c *Client) VerifyPassword(raw string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(c.SecretHash), []byte(raw)) == nil
 }
-func (c *Client) ScopeList() []string { return strings.Fields(c.AllowedScopes) }
+func (c *Client) ScopeList() []string { return append([]string(nil), c.Scopes...) }
 func (c *Client) AllowsGrant(grant oauth2.GrantType) bool {
 	switch c.Kind {
 	case KindAuthorizationCode:
@@ -71,7 +73,7 @@ func (s *Store) GetByID(ctx context.Context, id string) (oauth2.ClientInfo, erro
 
 func (s *Store) GetClient(ctx context.Context, id string) (*Client, error) {
 	const query = `
-		SELECT id, name, kind, secret_hash, redirect_uri, allowed_scopes, is_public, user_id, created_at
+		SELECT id, name, kind, secret_hash, redirect_uri, is_public, user_id, created_at
 		FROM oauth_clients WHERE id = ?`
 	var client Client
 	if err := s.db.GetContext(ctx, &client, query, id); err != nil {
@@ -80,18 +82,62 @@ func (s *Store) GetClient(ctx context.Context, id string) (*Client, error) {
 		}
 		return nil, err
 	}
+	scopes, err := s.GetScopes(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	client.Scopes = make([]string, 0, len(scopes))
+	for _, scope := range scopes {
+		client.Scopes = append(client.Scopes, scope.Code)
+	}
 	return &client, nil
 }
 
+func (s *Store) GetScopes(ctx context.Context, clientID string) ([]entity.Scope, error) {
+	var scopes []entity.Scope
+	err := s.db.SelectContext(ctx, &scopes, `
+		SELECT scopes.code, scopes.audience
+		FROM oauth_client_scopes
+		JOIN scopes ON scopes.code = oauth_client_scopes.scope_code
+		WHERE oauth_client_scopes.client_id = ?
+		ORDER BY scopes.code`, clientID)
+	return scopes, err
+}
+
+func (s *Store) GetRoleScopes(ctx context.Context, role entity.Role) ([]entity.Scope, error) {
+	var scopes []entity.Scope
+	err := s.db.SelectContext(ctx, &scopes, `
+		SELECT scopes.code, scopes.audience
+		FROM role_scopes
+		JOIN scopes ON scopes.code = role_scopes.scope_code
+		WHERE role_scopes.role_code = ?
+		ORDER BY scopes.code`, role)
+	return scopes, err
+}
+
 func (s *Store) Create(ctx context.Context, client *Client) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	const query = `
-		INSERT INTO oauth_clients (id, name, kind, secret_hash, redirect_uri, allowed_scopes, is_public, user_id, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := s.db.ExecContext(ctx, query,
-		client.ID, client.Name, client.Kind, client.SecretHash, client.RedirectURI, client.AllowedScopes,
-		client.Public, client.UserID, client.CreatedAt,
-	)
-	return err
+		INSERT INTO oauth_clients (id, name, kind, secret_hash, redirect_uri, is_public, user_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	if _, err = tx.ExecContext(ctx, query,
+		client.ID, client.Name, client.Kind, client.SecretHash, client.RedirectURI, client.Public, client.UserID, client.CreatedAt,
+	); err != nil {
+		return err
+	}
+	for _, scope := range client.Scopes {
+		if _, err = tx.ExecContext(ctx,
+			`INSERT INTO oauth_client_scopes (client_id, scope_code) VALUES (?, ?)`, client.ID, scope,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) AllowsGrant(ctx context.Context, clientID string, grant oauth2.GrantType) (bool, error) {

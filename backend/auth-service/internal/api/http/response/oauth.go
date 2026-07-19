@@ -11,7 +11,7 @@ type OAuthMetadata struct {
 	GrantTypesSupported               []string `json:"grant_types_supported" example:"authorization_code,refresh_token,client_credentials"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported" example:"client_secret_basic"`
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported" example:"S256"`
-	ScopesSupported                   []string `json:"scopes_supported" example:"library:read,library:write"`
+	ScopesSupported                   []string `json:"scopes_supported" example:"books:read,loans:borrow:self"`
 }
 
 func NewOAuthMetadata(metadata entity.OAuthMetadata) OAuthMetadata {

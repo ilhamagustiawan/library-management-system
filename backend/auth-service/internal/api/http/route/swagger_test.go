@@ -57,13 +57,13 @@ func TestRegisterSwaggerServesUIAndDocumentsRoutes(t *testing.T) {
 		"/api/v1/auth/login",
 		"/api/v1/auth/logout",
 		"/api/v1/auth/me",
-		"/api/v1/auth/register",
 		"/api/v1/oauth/userinfo",
 		"/health/liveness",
 		"/health/readiness",
 		"/oauth/authorize",
 		"/oauth/introspect",
 		"/oauth/token",
+		"/internal/identities",
 	} {
 		if _, ok := spec.Paths[path]; !ok {
 			t.Errorf("Swagger spec missing %s", path)

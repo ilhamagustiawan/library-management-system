@@ -40,3 +40,12 @@ func TestOnlyResourceServerCanIntrospect(t *testing.T) {
 		}
 	}
 }
+
+func TestClientScopeListReturnsIndependentCopy(t *testing.T) {
+	client := Client{Scopes: []string{"books:read"}}
+	scopes := client.ScopeList()
+	scopes[0] = "books:manage"
+	if client.ScopeList()[0] != "books:read" {
+		t.Fatal("ScopeList() exposed mutable client state")
+	}
+}

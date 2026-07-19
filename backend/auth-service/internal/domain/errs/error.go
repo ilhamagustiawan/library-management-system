@@ -3,15 +3,17 @@ package errs
 import "errors"
 
 const (
-	CodeSuccess            = "LMS-200000"
-	CodeValidation         = "LMS-422001"
-	CodeInvalidCredentials = "LMS-401001"
-	CodeInvalidToken       = "LMS-401002"
-	CodeUserNotFound       = "LMS-404001"
-	CodeEmailExists        = "LMS-409001"
-	CodeRateLimited        = "LMS-429001"
-	CodeNotFound           = "LMS-404000"
-	CodeInternal           = "LMS-500000"
+	CodeSuccess             = "LMS-200000"
+	CodeValidation          = "LMS-422001"
+	CodeInvalidCredentials  = "LMS-401001"
+	CodeInvalidToken        = "LMS-401002"
+	CodeUserNotFound        = "LMS-404001"
+	CodeEmailExists         = "LMS-409001"
+	CodeIdempotencyConflict = "LMS-409002"
+	CodeForbidden           = "LMS-403001"
+	CodeRateLimited         = "LMS-429001"
+	CodeNotFound            = "LMS-404000"
+	CodeInternal            = "LMS-500000"
 )
 
 var (

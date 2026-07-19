@@ -8,14 +8,46 @@ import (
 func TestLoadAllowsAdministrativeCommandsWithoutClientSecret(t *testing.T) {
 	t.Setenv("OAUTH_CLIENT_SECRET", "")
 	t.Setenv("OAUTH_INTROSPECTION_CLIENT_SECRET", "")
+	t.Setenv("OAUTH_JWT_SIGNING_KEY", "")
 
 	if _, err := Load(); err != nil {
-		t.Fatalf("Load() error = %v, want config without seeded-client credentials", err)
+		t.Fatalf("Load() error = %v, want config without runtime credentials", err)
+	}
+}
+
+func TestLoadDefaultsOAuthIssuerToGateway(t *testing.T) {
+	t.Setenv("OAUTH_ISSUER", "")
+
+	cfg, err := Load()
+
+	if err != nil || cfg.OAuth.Issuer != "http://localhost:8000" {
+		t.Fatalf("Load() OAuth issuer = %q, error = %v; want gateway origin", cfg.OAuth.Issuer, err)
+	}
+}
+
+func TestLoadServerRequiresStrongJWTSigningKey(t *testing.T) {
+	t.Setenv("OAUTH_JWT_SIGNING_KEY", "short")
+
+	_, err := LoadServer()
+
+	if err == nil || !strings.Contains(err.Error(), "OAUTH_JWT_SIGNING_KEY") {
+		t.Fatalf("LoadServer() error = %v, want JWT signing-key error", err)
+	}
+}
+
+func TestLoadServerConfiguresJWTSigningKey(t *testing.T) {
+	key := strings.Repeat("k", 32)
+	t.Setenv("OAUTH_JWT_SIGNING_KEY", key)
+
+	cfg, err := LoadServer()
+
+	if err != nil || string(cfg.OAuth.JWTSigningKey) != key {
+		t.Fatalf("LoadServer() JWT key = %q, error = %v", cfg.OAuth.JWTSigningKey, err)
 	}
 }
 
 func TestLoadConfiguresSupportedOAuthScopes(t *testing.T) {
-	t.Setenv("OAUTH_CLIENT_SCOPES", "library:read  library:write")
+	t.Setenv("OAUTH_CLIENT_SCOPES", "books:read  loans:borrow:self")
 
 	cfg, err := Load()
 	if err != nil {

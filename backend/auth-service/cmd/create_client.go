@@ -30,12 +30,14 @@ func runCreateClient(cmd *cobra.Command, _ []string) error {
 	clientID, _ := cmd.Flags().GetString("id")
 	redirectURI, _ := cmd.Flags().GetString("redirect-uri")
 	scopes, _ := cmd.Flags().GetString("scopes")
+	kindValue, _ := cmd.Flags().GetString("kind")
 	if strings.TrimSpace(name) == "" {
 		return fmt.Errorf("--name is required")
 	}
-	if err := validateRedirectURI(redirectURI); err != nil {
+	if err := validateClientProvisioning(kindValue, redirectURI, scopes); err != nil {
 		return err
 	}
+	kind := oauthClientRepo.Kind(kindValue)
 	if clientID == "" {
 		clientID = uuid.NewString()
 	}
@@ -62,10 +64,9 @@ func runCreateClient(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("hash client secret: %w", err)
 	}
 	client := &oauthClientRepo.Client{
-		// TODO: Add separate machine-client provisioning after onboarding and secret-delivery requirements exist.
-		ID: clientID, Name: strings.TrimSpace(name), Kind: oauthClientRepo.KindAuthorizationCode,
+		ID: clientID, Name: strings.TrimSpace(name), Kind: kind,
 		SecretHash: secretHash, RedirectURI: redirectURI,
-		AllowedScopes: strings.Join(strings.Fields(scopes), " "), Public: false,
+		Scopes: strings.Fields(scopes), Public: false,
 		UserID: sql.NullString{}, CreatedAt: time.Now().UTC(),
 	}
 	if err := oauthClientRepo.NewStore(db).Create(cmd.Context(), client); err != nil {
@@ -80,7 +81,32 @@ func init() {
 	createClientCmd.Flags().String("name", "", "human-readable client name")
 	createClientCmd.Flags().String("id", "", "client ID (generated when omitted)")
 	createClientCmd.Flags().String("redirect-uri", "", "exact OAuth callback URL")
-	createClientCmd.Flags().String("scopes", "library:read library:write", "space-separated allowed scopes")
+	createClientCmd.Flags().String("kind", string(oauthClientRepo.KindAuthorizationCode), "authorization_code, client_credentials, or resource_server")
+	createClientCmd.Flags().String("scopes", "loans:borrow:self loans:return:self transactions:read:self books:read", "space-separated allowed scopes")
+}
+
+func validateClientProvisioning(kindValue, redirectURI, scopes string) error {
+	kind := oauthClientRepo.Kind(kindValue)
+	switch kind {
+	case oauthClientRepo.KindAuthorizationCode:
+		if err := validateRedirectURI(redirectURI); err != nil {
+			return err
+		}
+	case oauthClientRepo.KindClientCredentials:
+		if redirectURI != "" {
+			return fmt.Errorf("--redirect-uri must be empty for client_credentials")
+		}
+		if len(strings.Fields(scopes)) == 0 {
+			return fmt.Errorf("--scopes must contain at least one scope for client_credentials")
+		}
+	case oauthClientRepo.KindResourceServer:
+		if redirectURI != "" || len(strings.Fields(scopes)) != 0 {
+			return fmt.Errorf("resource_server requires empty --redirect-uri and --scopes")
+		}
+	default:
+		return fmt.Errorf("--kind must be authorization_code, client_credentials, or resource_server")
+	}
+	return nil
 }
 
 func validateRedirectURI(raw string) error {

@@ -28,6 +28,7 @@ type Usecase interface {
 	Register(ctx context.Context, input RegisterInput) (*entity.User, error)
 	Login(ctx context.Context, input LoginInput) (*LoginResult, error)
 	AuthenticateSession(ctx context.Context, token string) (*entity.User, error)
+	FindUser(ctx context.Context, id string) (*entity.User, error)
 	Logout(ctx context.Context, token string) error
 }
 

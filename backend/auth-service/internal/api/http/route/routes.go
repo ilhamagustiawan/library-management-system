@@ -11,6 +11,7 @@ import (
 	apidocs "github.com/ilhamagustiawan/library-management-system/backend/auth-service/docs"
 	authhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/auth"
 	healthhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/healthcheck"
+	identityhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/identity"
 	oauthhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/oauth"
 	"github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/helper"
 	appmiddleware "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/middleware"
@@ -25,6 +26,7 @@ type Config struct {
 
 type Dependency struct {
 	Auth     authhandler.Handler
+	Identity *identityhandler.Handler
 	Health   *healthhandler.Handler
 	OAuth    *oauthinfra.AuthorizationServer
 	OAuthAPI *oauthhandler.Handler
@@ -56,7 +58,6 @@ func (r *Router) Register(app *fiber.App) {
 	app.Get("/.well-known/oauth-authorization-server", r.deps.OAuthAPI.Metadata)
 
 	auth := app.Group("/api/v1/auth")
-	auth.Post("/register", trustedOrigin, authLimit, r.deps.Auth.Register)
 	auth.Post("/login", trustedOrigin, authLimit, r.deps.Auth.Login)
 	auth.Post("/logout", trustedOrigin, r.deps.Auth.Logout)
 	auth.Get("/me", r.deps.Auth.Me)
@@ -65,6 +66,7 @@ func (r *Router) Register(app *fiber.App) {
 	app.Get("/oauth/authorize", adaptor.HTTPHandler(r.deps.OAuth.AuthorizeHandler()))
 	app.Post("/oauth/token", authLimit, adaptor.HTTPHandler(r.deps.OAuth.TokenHandler()))
 	app.Post("/oauth/introspect", adaptor.HTTPHandler(r.deps.OAuth.IntrospectionHandler()))
+	app.Post("/internal/identities", r.deps.Identity.Create)
 }
 
 func registerSwagger(app *fiber.App) {

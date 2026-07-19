@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,23 +32,10 @@ func (fakeUsecase) AuthenticateSession(_ context.Context, token string) (*entity
 	}
 	return nil, context.Canceled
 }
-func (fakeUsecase) Logout(context.Context, string) error { return nil }
-
-func TestRegisterRejectsInvalidInput(t *testing.T) {
-	app := testApp()
-	request := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(`{"name":"Ada","email":"not-email","password":"short"}`))
-	request.Header.Set("Content-Type", "application/json")
-
-	response, err := app.Test(request)
-	if err != nil {
-		t.Fatalf("app.Test() error = %v", err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusUnprocessableEntity {
-		body, _ := io.ReadAll(response.Body)
-		t.Fatalf("status = %d, want 422; body=%s", response.StatusCode, body)
-	}
+func (fakeUsecase) FindUser(context.Context, string) (*entity.User, error) {
+	return &entity.User{ID: "user-1", Role: entity.RoleMember}, nil
 }
+func (fakeUsecase) Logout(context.Context, string) error { return nil }
 
 func TestLoginSetsSessionCookieAndRedirectsOnlyToLocalAuthorizeEndpoint(t *testing.T) {
 	app := testApp()
@@ -96,7 +82,6 @@ func testApp() *fiber.App {
 		Issuer: "http://auth.example", SessionCookieName: "lms_session", SessionCookieSecure: true,
 	})
 	app := fiber.New()
-	app.Post("/register", handler.Register)
 	app.Post("/login", handler.Login)
 	return app
 }

@@ -19,7 +19,7 @@ func (r fakeAccessTokenRepository) FindUserIDByAccessToken(context.Context, stri
 }
 
 func (r fakeAccessTokenRepository) Metadata() entity.OAuthMetadata {
-	return entity.NewOAuthMetadata("http://auth.example/", []string{"library:read"})
+	return entity.NewOAuthMetadata("http://auth.example/", []string{"books:read"})
 }
 
 type fakeUserRepository struct {

@@ -20,6 +20,7 @@ import (
 
 	authhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/auth"
 	healthhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/healthcheck"
+	identityhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/identity"
 	oauthhandler "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/handler/oauth"
 	"github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/helper"
 	"github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/api/http/route"
@@ -27,6 +28,7 @@ import (
 	authinfra "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/auth"
 	infraDB "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/db"
 	healthRepo "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/db/repository/healthcheck"
+	identityRepo "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/db/repository/identity"
 	oauthClientRepo "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/db/repository/oauthclient"
 	oauthTokenRepo "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/db/repository/oauthtoken"
 	sessionRepo "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/db/repository/session"
@@ -34,6 +36,7 @@ import (
 	oauthinfra "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/oauth"
 	authusecase "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/usecase/auth"
 	healthusecase "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/usecase/healthcheck"
+	identityusecase "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/usecase/identity"
 	oauthusecase "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/usecase/oauth"
 )
 
@@ -44,7 +47,7 @@ type Server struct {
 }
 
 func New(ctx context.Context) (*Server, error) {
-	cfg, err := config.Load()
+	cfg, err := config.LoadServer()
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -82,11 +85,14 @@ func buildApp(ctx context.Context, cfg config.Config, db *sqlx.DB) (*fiber.App, 
 	manager := manage.NewDefaultManager()
 	manager.MapClientStorage(clients)
 	manager.MapTokenStorage(tokens)
-	oauthServer := oauthinfra.NewAuthorizationServer(manager, authUC, clients, oauthinfra.Config{
+	oauthServer, err := oauthinfra.NewAuthorizationServer(manager, authUC, clients, oauthinfra.Config{
 		Issuer: cfg.OAuth.Issuer, LoginURL: cfg.OAuth.LoginURL, SessionCookieName: cfg.Auth.SessionCookieName,
 		CodeTTL: cfg.OAuth.CodeTTL, AccessTokenTTL: cfg.OAuth.AccessTokenTTL, RefreshTokenTTL: cfg.OAuth.RefreshTokenTTL,
-		SupportedScopes: cfg.OAuth.SupportedScopes,
+		SupportedScopes: cfg.OAuth.SupportedScopes, JWTSigningKey: cfg.OAuth.JWTSigningKey,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	app := fiber.New(fiberConfig(cfg))
 	app.Use(requestid.New())
@@ -105,9 +111,11 @@ func buildApp(ctx context.Context, cfg config.Config, db *sqlx.DB) (*fiber.App, 
 	oauthUC := oauthusecase.NewUsecase(oauthServer, users)
 	healthUC := healthusecase.NewUsecase(healthRepo.NewRepository(db))
 	oauthHTTP := oauthhandler.NewHandler(oauthUC)
+	identityUC := identityusecase.New(identityRepo.NewRepository(db), hasher)
+	identityHTTP := identityhandler.NewHandler(identityUC, oauthServer, validator.New())
 	routes := route.New(route.Config{
 		AllowedOrigin: cfg.Service.AllowedOrigin, AuthRateMax: cfg.Auth.RateLimitMax, AuthRateWindow: cfg.Auth.RateLimitWindow,
-	}, route.Dependency{Auth: authHTTP, Health: healthhandler.NewHandler(healthUC), OAuth: oauthServer, OAuthAPI: oauthHTTP})
+	}, route.Dependency{Auth: authHTTP, Identity: identityHTTP, Health: healthhandler.NewHandler(healthUC), OAuth: oauthServer, OAuthAPI: oauthHTTP})
 	routes.Register(app)
 	return app, nil
 }

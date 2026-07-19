@@ -23,6 +23,12 @@ definitions:
       active:
         example: true
         type: boolean
+      aud:
+        example:
+        - library-api
+        items:
+          type: string
+        type: array
       client_id:
         example: member-nextjs-web
         type: string
@@ -35,8 +41,11 @@ definitions:
       iss:
         example: http://localhost:8081
         type: string
+      role:
+        example: member
+        type: string
       scope:
-        example: library:read
+        example: books:read
         type: string
       sub:
         example: f81d4fae-7dec-11d0-a765-00a0c91e6bf6
@@ -48,7 +57,7 @@ definitions:
   oauth.OAuthTokenResponse:
     properties:
       access_token:
-        example: opaque-access-token
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsibGlicmFyeS1hcGkiXX0.signature
         type: string
       expires_in:
         example: 900
@@ -57,7 +66,7 @@ definitions:
         example: opaque-refresh-token
         type: string
       scope:
-        example: library:read library:write
+        example: books:read loans:borrow:self
         type: string
       token_type:
         example: Bearer
@@ -150,8 +159,8 @@ definitions:
         type: array
       scopes_supported:
         example:
-        - library:read
-        - library:write
+        - books:read
+        - loans:borrow:self
         items:
           type: string
         type: array
@@ -179,6 +188,9 @@ definitions:
       name:
         example: Ada Lovelace
         type: string
+      role:
+        example: member
+        type: string
       updatedAt:
         example: "2026-07-19T08:00:00Z"
         type: string
@@ -195,7 +207,7 @@ info:
   contact: {}
   description: |-
     OAuth 2.0 authorization and user authentication service for the library management system.
-    This service uses opaque bearer tokens, Authorization Code with PKCE, and HttpOnly session cookies.
+    This service uses JWT access tokens, Authorization Code with PKCE, and HttpOnly session cookies.
   title: Library Management Auth API
   version: "1.0"
 paths:
@@ -314,49 +326,6 @@ paths:
       summary: Get current user
       tags:
       - Authentication
-  /api/v1/auth/register:
-    post:
-      consumes:
-      - application/json
-      description: Creates a user account. Requests from browsers must use the configured
-        trusted Origin.
-      parameters:
-      - description: Registration details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.Register'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: User created
-          schema:
-            $ref: '#/definitions/response.UserSuccess'
-        "403":
-          description: Untrusted request origin
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "409":
-          description: Email already registered
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "422":
-          description: Invalid registration data
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "429":
-          description: Rate limit exceeded
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      summary: Register user
-      tags:
-      - Authentication
   /api/v1/oauth/userinfo:
     get:
       produces:
@@ -411,6 +380,50 @@ paths:
       summary: Check readiness
       tags:
       - Health
+  /internal/identities:
+    post:
+      consumes:
+      - application/json
+      description: Internal idempotent endpoint. Requires a User Service bearer token
+        with identities:create.
+      parameters:
+      - description: Stable registration command key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Member identity
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.Register'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Identity created or replayed
+          schema:
+            $ref: '#/definitions/response.UserSuccess'
+        "401":
+          description: Invalid service token
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Service scope denied
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Email or idempotency conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Invalid identity data
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Create member identity
+      tags:
+      - Internal
   /oauth/authorize:
     get:
       description: Validates the client, redirect URI, state, and S256 PKCE challenge.
@@ -474,7 +487,7 @@ paths:
       description: RFC 7662 endpoint restricted to provisioned resource-server clients
         using HTTP Basic.
       parameters:
-      - description: Opaque access token
+      - description: JWT access token
         in: formData
         name: token
         required: true

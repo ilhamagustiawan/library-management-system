@@ -14,7 +14,10 @@ import (
 	infraDB "github.com/ilhamagustiawan/library-management-system/backend/auth-service/internal/infra/db"
 )
 
-const developmentOAuthSeedPath = "./db/seeds/oauth_clients.sql"
+const (
+	developmentUsersSeedPath = "./db/seeds/users.sql"
+	developmentOAuthSeedPath = "./db/seeds/oauth_clients.sql"
+)
 
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
@@ -44,7 +47,7 @@ func runMigration(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		defer db.Close()
-		return infraDB.ApplySeedFile(ctx, db, developmentOAuthSeedPath)
+		return infraDB.ApplySeedFiles(ctx, db, developmentUsersSeedPath, developmentOAuthSeedPath)
 	})
 }
 

@@ -104,6 +104,9 @@ func TestRegisterNormalizesIdentityAndHashesPassword(t *testing.T) {
 	if user.PasswordHash != "hashed:correct horse battery staple" {
 		t.Fatalf("password hash = %q, want generated hash", user.PasswordHash)
 	}
+	if user.Role != entity.RoleMember {
+		t.Fatalf("role = %q, want member", user.Role)
+	}
 }
 
 func TestRegisterMapsDuplicateEmailToConflict(t *testing.T) {

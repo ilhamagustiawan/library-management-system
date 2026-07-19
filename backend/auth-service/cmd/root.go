@@ -21,5 +21,5 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.AddCommand(serveCmd, migrateCmd, createClientCmd, swaggerCmd)
+	rootCmd.AddCommand(serveCmd, migrateCmd, createClientCmd, createAdminCmd, swaggerCmd)
 }

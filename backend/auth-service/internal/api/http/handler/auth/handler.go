@@ -21,7 +21,6 @@ type Config struct {
 }
 
 type Handler interface {
-	Register(c *fiber.Ctx) error
 	Login(c *fiber.Ctx) error
 	Logout(c *fiber.Ctx) error
 	Me(c *fiber.Ctx) error
@@ -43,35 +42,6 @@ func NewHandler(usecase authusecase.Usecase, validate *validator.Validate, confi
 			Name: config.SessionCookieName, Domain: config.SessionCookieDomain, Secure: config.SessionCookieSecure,
 		},
 	}
-}
-
-// Register creates a user account.
-//
-// @Summary Register user
-// @Description Creates a user account. Requests from browsers must use the configured trusted Origin.
-// @Tags Authentication
-// @Accept json
-// @Produce json
-// @Param request body request.Register true "Registration details"
-// @Success 201 {object} response.UserSuccess "User created"
-// @Failure 403 {object} response.ErrorResponse "Untrusted request origin"
-// @Failure 409 {object} response.ErrorResponse "Email already registered"
-// @Failure 422 {object} response.ErrorResponse "Invalid registration data"
-// @Failure 429 {object} response.ErrorResponse "Rate limit exceeded"
-// @Failure 500 {object} response.ErrorResponse "Internal error"
-// @Router /api/v1/auth/register [post]
-func (h *handler) Register(c *fiber.Ctx) error {
-	var input request.Register
-	if err := request.DecodeStrictJSON(c, &input); err != nil || h.validate.Struct(input) != nil {
-		return response.ValidationError(c, "invalid registration data")
-	}
-	user, err := h.usecase.Register(c.UserContext(), authusecase.RegisterInput{
-		Name: input.Name, Email: input.Email, Password: input.Password,
-	})
-	if err != nil {
-		return response.Error(c, err)
-	}
-	return response.Success(c, http.StatusCreated, response.NewUser(user))
 }
 
 // Login creates an auth-service session.

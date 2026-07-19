@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,14 +27,17 @@ type Config struct {
 	AccessTokenTTL    time.Duration
 	RefreshTokenTTL   time.Duration
 	SupportedScopes   []string
+	JWTSigningKey     []byte
 }
 
 type SessionAuthenticator interface {
 	AuthenticateSession(ctx context.Context, token string) (*entity.User, error)
+	FindUser(ctx context.Context, id string) (*entity.User, error)
 }
 
 type ClientPolicyStore interface {
-	AllowsScopes(ctx context.Context, clientID, requested string) (bool, error)
+	GetScopes(ctx context.Context, clientID string) ([]entity.Scope, error)
+	GetRoleScopes(ctx context.Context, role entity.Role) ([]entity.Scope, error)
 	AllowsGrant(ctx context.Context, clientID string, grant oauth2lib.GrantType) (bool, error)
 	CanIntrospect(ctx context.Context, clientID string) (bool, error)
 }
@@ -46,12 +50,21 @@ type AuthorizationServer struct {
 	config   Config
 }
 
+var ErrInvalidServiceToken = errors.New("invalid service token")
+var ErrInsufficientServiceGrant = errors.New("insufficient service grant")
+
 func NewAuthorizationServer(
 	manager *manage.Manager,
 	sessions SessionAuthenticator,
 	policies ClientPolicyStore,
 	config Config,
-) *AuthorizationServer {
+) (*AuthorizationServer, error) {
+	accessTokens, err := NewAccessTokenGenerator(AccessTokenConfig{Issuer: config.Issuer, SigningKey: config.JWTSigningKey})
+	if err != nil {
+		return nil, fmt.Errorf("configure OAuth access tokens: %w", err)
+	}
+	manager.MapAccessGenerate(accessTokens)
+	manager.SetExtractExtensionHandler(extractTokenGrant)
 	manager.SetAuthorizeCodeExp(config.CodeTTL)
 	manager.SetAuthorizeCodeTokenCfg(&manage.Config{
 		AccessTokenExp: config.AccessTokenTTL, RefreshTokenExp: config.RefreshTokenTTL, IsGenerateRefresh: true,
@@ -81,9 +94,11 @@ func NewAuthorizationServer(
 	result := &AuthorizationServer{server: srv, manager: manager, sessions: sessions, policies: policies, config: config}
 	srv.SetClientAuthorizedHandler(result.clientAuthorized)
 	srv.SetClientScopeHandler(result.clientScope)
+	srv.SetAuthorizeScopeHandler(result.authorizeScope)
 	srv.SetRefreshingScopeHandler(refreshingScope)
+	srv.SetRefreshingValidationHandler(result.validateRefresh)
 	srv.SetUserAuthorizationHandler(result.authorizeUser)
-	return result
+	return result, nil
 }
 
 func validateRedirectURI(registered, requested string) error {
@@ -102,11 +117,87 @@ func (s *AuthorizationServer) clientScope(request *oauth2lib.TokenGenerateReques
 	if request.Request != nil {
 		ctx = request.Request.Context()
 	}
-	return s.policies.AllowsScopes(ctx, request.ClientID, request.Scope)
+	if request.UserID != "" {
+		_, ok := tokenGrantFromContext(ctx)
+		return ok, nil
+	}
+	clientScopes, err := s.policies.GetScopes(ctx, request.ClientID)
+	if err != nil {
+		return false, err
+	}
+	grant, err := entity.ResolveServiceScopeGrant(request.Scope, clientScopes)
+	if errors.Is(err, entity.ErrInvalidScope) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	request.Scope = grant.String()
+	if request.Request != nil {
+		setTokenGrantContext(request.Request, tokenGrant{ScopeGrant: grant})
+	}
+	return true, nil
+}
+
+func (s *AuthorizationServer) authorizeScope(_ http.ResponseWriter, r *http.Request) (string, error) {
+	user, ok := authorizedUserFromContext(r.Context())
+	if !ok {
+		return "", oauth2errors.ErrAccessDenied
+	}
+	roleScopes, err := s.policies.GetRoleScopes(r.Context(), user.Role)
+	if err != nil {
+		return "", err
+	}
+	clientScopes, err := s.policies.GetScopes(r.Context(), r.FormValue("client_id"))
+	if err != nil {
+		return "", err
+	}
+	grant, err := entity.ResolveUserScopeGrant(r.FormValue("scope"), user.Role, roleScopes, clientScopes)
+	if errors.Is(err, entity.ErrInvalidScope) {
+		return "", oauth2errors.ErrInvalidScope
+	}
+	if err != nil {
+		return "", err
+	}
+	setTokenGrantContext(r, tokenGrant{ScopeGrant: grant, Role: user.Role})
+	return grant.String(), nil
 }
 
 func refreshingScope(request *oauth2lib.TokenGenerateRequest, oldScope string) (bool, error) {
 	return scopeSubset(request.Scope, oldScope), nil
+}
+
+func (s *AuthorizationServer) validateRefresh(token oauth2lib.TokenInfo) (bool, error) {
+	clientScopes, err := s.policies.GetScopes(context.Background(), token.GetClientID())
+	if err != nil {
+		return false, err
+	}
+	extendable, ok := token.(oauth2lib.ExtendableTokenInfo)
+	if !ok {
+		return false, nil
+	}
+	extension := extendable.GetExtension()
+	storedAudience := extension.Get(tokenAudienceExtension)
+	if token.GetUserID() == "" {
+		grant, err := entity.ResolveServiceScopeGrant(token.GetScope(), clientScopes)
+		return err == nil && grant.String() == token.GetScope() && grant.Audience == storedAudience, nil
+	}
+
+	user, err := s.sessions.FindUser(context.Background(), token.GetUserID())
+	if err != nil {
+		return false, err
+	}
+	roleScopes, err := s.policies.GetRoleScopes(context.Background(), user.Role)
+	if err != nil {
+		return false, err
+	}
+	grant, err := entity.ResolveUserScopeGrant(token.GetScope(), user.Role, roleScopes, clientScopes)
+	if err != nil || grant.String() != token.GetScope() || grant.Audience != storedAudience {
+		return false, nil
+	}
+	extension.Set(tokenRoleExtension, user.Role.String())
+	extendable.SetExtension(extension)
+	return true, nil
 }
 
 // AuthorizeHandler starts an OAuth Authorization Code flow.
@@ -154,11 +245,15 @@ func (s *AuthorizationServer) handleAuthorize(w http.ResponseWriter, r *http.Req
 
 	writer := &trackingResponseWriter{ResponseWriter: w}
 	if err := s.server.HandleAuthorizeRequest(writer, r); err != nil && !writer.wroteHeader {
+		if errors.Is(err, oauth2errors.ErrInvalidScope) {
+			writeOAuthError(w, http.StatusBadRequest, "invalid_scope", "requested scope is not allowed")
+			return
+		}
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "authorization request rejected")
 	}
 }
 
-// TokenHandler exchanges grants for opaque access tokens.
+// TokenHandler exchanges grants for JWT access tokens.
 //
 // @Summary Issue OAuth token
 // @Description Supports authorization_code, refresh_token, and provisioned client_credentials clients. Client authentication uses HTTP Basic.
@@ -198,17 +293,19 @@ func (s *AuthorizationServer) handleToken(w http.ResponseWriter, r *http.Request
 }
 
 type introspectionResponse struct {
-	Active    bool   `json:"active"`
-	ClientID  string `json:"client_id,omitempty"`
-	Scope     string `json:"scope,omitempty"`
-	TokenType string `json:"token_type,omitempty"`
-	Subject   string `json:"sub,omitempty"`
-	Issuer    string `json:"iss,omitempty"`
-	IssuedAt  int64  `json:"iat,omitempty"`
-	ExpiresAt int64  `json:"exp,omitempty"`
+	Active    bool        `json:"active"`
+	ClientID  string      `json:"client_id,omitempty"`
+	Scope     string      `json:"scope,omitempty"`
+	TokenType string      `json:"token_type,omitempty"`
+	Subject   string      `json:"sub,omitempty"`
+	Issuer    string      `json:"iss,omitempty"`
+	IssuedAt  int64       `json:"iat,omitempty"`
+	ExpiresAt int64       `json:"exp,omitempty"`
+	Audience  []string    `json:"aud,omitempty"`
+	Role      entity.Role `json:"role,omitempty"`
 }
 
-// IntrospectionHandler reports opaque access-token state.
+// IntrospectionHandler reports JWT access-token state.
 //
 // @Summary Introspect access token
 // @Description RFC 7662 endpoint restricted to provisioned resource-server clients using HTTP Basic.
@@ -216,7 +313,7 @@ type introspectionResponse struct {
 // @Accept x-www-form-urlencoded
 // @Produce json
 // @Security BasicAuth
-// @Param token formData string true "Opaque access token"
+// @Param token formData string true "JWT access token"
 // @Param token_type_hint formData string false "Token type hint" Enums(access_token)
 // @Success 200 {object} OAuthIntrospectionResponse "Token state; inactive tokens include only active=false"
 // @Failure 400 {object} OAuthErrorResponse "Token missing or request invalid"
@@ -261,6 +358,16 @@ func (s *AuthorizationServer) handleIntrospection(w http.ResponseWriter, r *http
 		Active: true, ClientID: token.GetClientID(), Scope: token.GetScope(), TokenType: "Bearer",
 		Subject: token.GetUserID(), Issuer: strings.TrimRight(s.config.Issuer, "/"),
 		IssuedAt: token.GetAccessCreateAt().Unix(),
+	}
+	if extendable, ok := token.(oauth2lib.ExtendableTokenInfo); ok {
+		extension := extendable.GetExtension()
+		if audience := extension.Get(tokenAudienceExtension); audience != "" {
+			response.Audience = []string{audience}
+		}
+		response.Role = entity.Role(extension.Get(tokenRoleExtension))
+	}
+	if response.Subject == "" && response.Role == "" {
+		response.Subject = response.ClientID
 	}
 	if ttl := token.GetAccessExpiresIn(); ttl > 0 {
 		response.ExpiresAt = token.GetAccessCreateAt().Add(ttl).Unix()
@@ -331,6 +438,31 @@ func (s *AuthorizationServer) FindUserIDByAccessToken(ctx context.Context, rawTo
 	return token.GetUserID(), nil
 }
 
+func (s *AuthorizationServer) AuthenticateServiceToken(
+	ctx context.Context,
+	rawToken string,
+	expectedClientID string,
+	expectedAudience string,
+	requiredScope string,
+) error {
+	token, err := s.manager.LoadAccessToken(ctx, rawToken)
+	if err != nil || token == nil || token.GetUserID() != "" || token.GetClientID() != expectedClientID {
+		return ErrInvalidServiceToken
+	}
+	extendable, ok := token.(oauth2lib.ExtendableTokenInfo)
+	if !ok {
+		return ErrInvalidServiceToken
+	}
+	extension := extendable.GetExtension()
+	if extension.Get(tokenAudienceExtension) != expectedAudience || extension.Get(tokenRoleExtension) != "" {
+		return ErrInvalidServiceToken
+	}
+	if !scopeSubset(requiredScope, token.GetScope()) {
+		return ErrInsufficientServiceGrant
+	}
+	return nil
+}
+
 func (s *AuthorizationServer) Metadata() entity.OAuthMetadata {
 	return entity.NewOAuthMetadata(s.config.Issuer, s.config.SupportedScopes)
 }
@@ -340,6 +472,7 @@ func (s *AuthorizationServer) authorizeUser(w http.ResponseWriter, r *http.Reque
 	if err == nil {
 		user, authErr := s.sessions.AuthenticateSession(r.Context(), cookie.Value)
 		if authErr == nil {
+			setAuthorizedUserContext(r, user)
 			return user.ID, nil
 		}
 	}
@@ -359,6 +492,53 @@ func (s *AuthorizationServer) authorizeUser(w http.ResponseWriter, r *http.Reque
 	loginURL.RawQuery = query.Encode()
 	http.Redirect(w, r, loginURL.String(), http.StatusFound)
 	return "", nil
+}
+
+type requestContextKey string
+
+const authorizedUserContextKey requestContextKey = "authorized-user"
+const tokenGrantContextKey requestContextKey = "token-grant"
+
+type tokenGrant struct {
+	entity.ScopeGrant
+	Role entity.Role
+}
+
+func setAuthorizedUserContext(r *http.Request, user *entity.User) {
+	*r = *r.WithContext(context.WithValue(r.Context(), authorizedUserContextKey, user))
+}
+
+func authorizedUserFromContext(ctx context.Context) (*entity.User, bool) {
+	user, ok := ctx.Value(authorizedUserContextKey).(*entity.User)
+	return user, ok && user != nil
+}
+
+func setTokenGrantContext(r *http.Request, grant tokenGrant) {
+	*r = *r.WithContext(context.WithValue(r.Context(), tokenGrantContextKey, grant))
+}
+
+func tokenGrantFromContext(ctx context.Context) (tokenGrant, bool) {
+	grant, ok := ctx.Value(tokenGrantContextKey).(tokenGrant)
+	return grant, ok
+}
+
+func extractTokenGrant(request *oauth2lib.TokenGenerateRequest, token oauth2lib.ExtendableTokenInfo) {
+	if request.Request == nil || token.GetExtension().Get(tokenAudienceExtension) != "" {
+		return
+	}
+	grant, ok := tokenGrantFromContext(request.Request.Context())
+	if !ok {
+		return
+	}
+	extension := token.GetExtension()
+	if extension == nil {
+		extension = make(url.Values)
+	}
+	extension.Set(tokenAudienceExtension, grant.Audience)
+	if grant.Role != "" {
+		extension.Set(tokenRoleExtension, grant.Role.String())
+	}
+	token.SetExtension(extension)
 }
 
 func bearerToken(r *http.Request) (string, bool) {
