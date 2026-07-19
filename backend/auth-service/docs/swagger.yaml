@@ -1,0 +1,583 @@
+basePath: /
+definitions:
+  oauth.APIErrorResponse:
+    properties:
+      code:
+        example: LMS-429001
+        type: string
+      message:
+        example: too many authentication attempts
+        type: string
+    type: object
+  oauth.OAuthErrorResponse:
+    properties:
+      error:
+        example: invalid_request
+        type: string
+      error_description:
+        example: the request is invalid
+        type: string
+    type: object
+  oauth.OAuthIntrospectionResponse:
+    properties:
+      active:
+        example: true
+        type: boolean
+      client_id:
+        example: member-nextjs-web
+        type: string
+      exp:
+        example: 1784448900
+        type: integer
+      iat:
+        example: 1784448000
+        type: integer
+      iss:
+        example: http://localhost:8081
+        type: string
+      scope:
+        example: library:read
+        type: string
+      sub:
+        example: f81d4fae-7dec-11d0-a765-00a0c91e6bf6
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  oauth.OAuthTokenResponse:
+    properties:
+      access_token:
+        example: opaque-access-token
+        type: string
+      expires_in:
+        example: 900
+        type: integer
+      refresh_token:
+        example: opaque-refresh-token
+        type: string
+      scope:
+        example: library:read library:write
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  request.Login:
+    properties:
+      email:
+        example: ada@example.com
+        maxLength: 254
+        type: string
+      password:
+        example: correct horse battery staple
+        maxLength: 72
+        type: string
+      returnTo:
+        example: http://localhost:8081/oauth/authorize
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  request.Register:
+    properties:
+      email:
+        example: ada@example.com
+        maxLength: 254
+        type: string
+      name:
+        example: Ada Lovelace
+        maxLength: 100
+        minLength: 2
+        type: string
+      password:
+        example: correct horse battery staple
+        maxLength: 72
+        minLength: 12
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  response.ErrorResponse:
+    properties:
+      code:
+        example: LMS-422001
+        type: string
+      data: {}
+      message:
+        example: invalid request data
+        type: string
+    type: object
+  response.Health:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  response.OAuthMetadata:
+    properties:
+      authorization_endpoint:
+        example: http://localhost:8081/oauth/authorize
+        type: string
+      code_challenge_methods_supported:
+        example:
+        - S256
+        items:
+          type: string
+        type: array
+      grant_types_supported:
+        example:
+        - authorization_code
+        - refresh_token
+        - client_credentials
+        items:
+          type: string
+        type: array
+      introspection_endpoint:
+        example: http://localhost:8081/oauth/introspect
+        type: string
+      issuer:
+        example: http://localhost:8081
+        type: string
+      response_types_supported:
+        example:
+        - code
+        items:
+          type: string
+        type: array
+      scopes_supported:
+        example:
+        - library:read
+        - library:write
+        items:
+          type: string
+        type: array
+      token_endpoint:
+        example: http://localhost:8081/oauth/token
+        type: string
+      token_endpoint_auth_methods_supported:
+        example:
+        - client_secret_basic
+        items:
+          type: string
+        type: array
+    type: object
+  response.User:
+    properties:
+      createdAt:
+        example: "2026-07-19T08:00:00Z"
+        type: string
+      email:
+        example: ada@example.com
+        type: string
+      id:
+        example: f81d4fae-7dec-11d0-a765-00a0c91e6bf6
+        type: string
+      name:
+        example: Ada Lovelace
+        type: string
+      updatedAt:
+        example: "2026-07-19T08:00:00Z"
+        type: string
+    type: object
+  response.UserSuccess:
+    properties:
+      code:
+        example: LMS-200000
+        type: string
+      data:
+        $ref: '#/definitions/response.User'
+    type: object
+info:
+  contact: {}
+  description: |-
+    OAuth 2.0 authorization and user authentication service for the library management system.
+    This service uses opaque bearer tokens, Authorization Code with PKCE, and HttpOnly session cookies.
+  title: Library Management Auth API
+  version: "1.0"
+paths:
+  /.well-known/oauth-authorization-server:
+    get:
+      description: Returns RFC 8414 discovery metadata for this OAuth server.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Authorization server metadata
+          schema:
+            $ref: '#/definitions/response.OAuthMetadata'
+      summary: Get authorization server metadata
+      tags:
+      - OAuth
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and sets an HttpOnly session cookie. HTML
+        form requests are also accepted. A valid returnTo redirects with 303.
+      parameters:
+      - description: Login details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.Login'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Authenticated user
+          schema:
+            $ref: '#/definitions/response.UserSuccess'
+        "303":
+          description: Redirect to authorization flow
+          schema:
+            type: string
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Untrusted request origin
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Invalid login data or return URL
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Log in
+      tags:
+      - Authentication
+  /api/v1/auth/logout:
+    post:
+      description: Revokes the session identified by the lms_session cookie and clears
+        that cookie.
+      parameters:
+      - description: 'Session cookie: lms_session=token'
+        in: header
+        name: Cookie
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          description: Invalid session
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Untrusted request origin
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Log out
+      tags:
+      - Authentication
+  /api/v1/auth/me:
+    get:
+      description: Returns the user identified by the lms_session cookie.
+      parameters:
+      - description: 'Session cookie: lms_session=token'
+        in: header
+        name: Cookie
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Current user
+          schema:
+            $ref: '#/definitions/response.UserSuccess'
+        "401":
+          description: Invalid session
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get current user
+      tags:
+      - Authentication
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a user account. Requests from browsers must use the configured
+        trusted Origin.
+      parameters:
+      - description: Registration details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.Register'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created
+          schema:
+            $ref: '#/definitions/response.UserSuccess'
+        "403":
+          description: Untrusted request origin
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Email already registered
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Invalid registration data
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Register user
+      tags:
+      - Authentication
+  /api/v1/oauth/userinfo:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token user
+          schema:
+            $ref: '#/definitions/response.UserSuccess'
+        "401":
+          description: Invalid or expired access token
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get token user
+      tags:
+      - OAuth
+  /health/liveness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Process is live
+          schema:
+            $ref: '#/definitions/response.Health'
+      summary: Check liveness
+      tags:
+      - Health
+  /health/readiness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is ready
+          schema:
+            $ref: '#/definitions/response.Health'
+        "503":
+          description: A required dependency is unavailable
+          schema:
+            $ref: '#/definitions/response.Health'
+      summary: Check readiness
+      tags:
+      - Health
+  /oauth/authorize:
+    get:
+      description: Validates the client, redirect URI, state, and S256 PKCE challenge.
+        Redirects unauthenticated users to login.
+      parameters:
+      - description: OAuth response type
+        enum:
+        - code
+        in: query
+        name: response_type
+        required: true
+        type: string
+      - description: OAuth client ID
+        in: query
+        name: client_id
+        required: true
+        type: string
+      - description: Exact registered callback URL
+        in: query
+        name: redirect_uri
+        required: true
+        type: string
+      - description: Space-delimited scopes
+        in: query
+        name: scope
+        required: true
+        type: string
+      - description: CSRF correlation value
+        in: query
+        name: state
+        required: true
+        type: string
+      - description: Base64url-encoded SHA-256 PKCE challenge
+        in: query
+        name: code_challenge
+        required: true
+        type: string
+      - description: PKCE method
+        enum:
+        - S256
+        in: query
+        name: code_challenge_method
+        required: true
+        type: string
+      responses:
+        "302":
+          description: Redirect to login or callback with authorization code
+          schema:
+            type: string
+        "400":
+          description: Invalid authorization request
+          schema:
+            $ref: '#/definitions/oauth.OAuthErrorResponse'
+      summary: Authorize OAuth client
+      tags:
+      - OAuth
+  /oauth/introspect:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: RFC 7662 endpoint restricted to provisioned resource-server clients
+        using HTTP Basic.
+      parameters:
+      - description: Opaque access token
+        in: formData
+        name: token
+        required: true
+        type: string
+      - description: Token type hint
+        enum:
+        - access_token
+        in: formData
+        name: token_type_hint
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token state; inactive tokens include only active=false
+          schema:
+            $ref: '#/definitions/oauth.OAuthIntrospectionResponse'
+        "400":
+          description: Token missing or request invalid
+          schema:
+            $ref: '#/definitions/oauth.OAuthErrorResponse'
+        "401":
+          description: Client authentication or authorization failed
+          schema:
+            $ref: '#/definitions/oauth.OAuthErrorResponse'
+        "500":
+          description: Token state could not be determined
+          schema:
+            $ref: '#/definitions/oauth.OAuthErrorResponse'
+      security:
+      - BasicAuth: []
+      summary: Introspect access token
+      tags:
+      - OAuth
+  /oauth/token:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Supports authorization_code, refresh_token, and provisioned client_credentials
+        clients. Client authentication uses HTTP Basic.
+      parameters:
+      - description: OAuth grant type
+        enum:
+        - authorization_code
+        - refresh_token
+        - client_credentials
+        in: formData
+        name: grant_type
+        required: true
+        type: string
+      - description: Authorization code; required for authorization_code
+        in: formData
+        name: code
+        type: string
+      - description: Exact callback URL; required for authorization_code
+        in: formData
+        name: redirect_uri
+        type: string
+      - description: PKCE verifier; required for authorization_code
+        in: formData
+        name: code_verifier
+        type: string
+      - description: Refresh token; required for refresh_token
+        in: formData
+        name: refresh_token
+        type: string
+      - description: Space-delimited requested scopes
+        in: formData
+        name: scope
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token issued
+          schema:
+            $ref: '#/definitions/oauth.OAuthTokenResponse'
+        "400":
+          description: Invalid request or grant
+          schema:
+            $ref: '#/definitions/oauth.OAuthErrorResponse'
+        "401":
+          description: Client authentication failed
+          schema:
+            $ref: '#/definitions/oauth.OAuthErrorResponse'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            $ref: '#/definitions/oauth.APIErrorResponse'
+      security:
+      - BasicAuth: []
+      summary: Issue OAuth token
+      tags:
+      - OAuth
+schemes:
+- http
+- https
+securityDefinitions:
+  BasicAuth:
+    type: basic
+  BearerAuth:
+    description: Prefix access tokens with "Bearer ".
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

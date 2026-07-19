@@ -10,7 +10,7 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates && addgroup -S app && adduser -S -G app app
 WORKDIR /app
 COPY --from=builder /out/auth-service /app/auth-service
-COPY --from=builder /src/db/migrations /app/db/migrations
+COPY --from=builder /src/db /app/db
 USER app
 EXPOSE 8081
 CMD ["/app/auth-service", "serve"]
