@@ -29,8 +29,9 @@ cd library-management-system
 ```
 
 The script validates Docker and Compose, builds every application image, starts
-the stack in the background, waits for health checks, and prints the local
-endpoints. It can be launched from any directory.
+the stack in the background, waits for health checks, verifies backend services
+have no host ports, and prints the local endpoints. It can be launched from any
+directory.
 
 Open the member application at [http://localhost:3000](http://localhost:3000).
 
@@ -98,11 +99,10 @@ intended.
 |---|---|
 | Member web | [http://localhost:3000](http://localhost:3000) |
 | Kong API Gateway | [http://localhost:8000](http://localhost:8000) |
-| Auth Service | [http://localhost:8081](http://localhost:8081) |
-| User Service | [http://localhost:8082](http://localhost:8082) |
-| Book Service | [http://localhost:8083](http://localhost:8083) |
-| Transaction Service | [http://localhost:8084](http://localhost:8084) |
 | RabbitMQ management | [http://localhost:15672](http://localhost:15672) |
+
+The four Go services have no host ports in the default Compose stack. Kong is
+their only HTTP ingress.
 
 Swagger UI is exposed through Kong:
 
@@ -115,17 +115,23 @@ Swagger UI is exposed through Kong:
 
 ```mermaid
 flowchart LR
-    Browser["Browser"] --> Web["Next.js member web<br/>:3000"]
-    Web -->|"Browser OAuth and API"| Kong["Kong API gateway<br/>:8000"]
-    Web -.->|"Server-side API via Compose network"| Kong
+    Browser["Browser"]
 
-    subgraph Services["Go microservices"]
-        Auth["Auth Service<br/>:8081"]
-        User["User Service<br/>:8082"]
-        Book["Book Service<br/>:8083"]
-        Transaction["Transaction Service<br/>:8084"]
+    subgraph Edge["Edge network"]
+        Web["Next.js member web<br/>:3000"]
+        Kong["Kong API gateway<br/>:8000"]
     end
 
+    subgraph Backend["Private backend network — no host ports"]
+        Auth["Auth Service<br/>:8081"]
+        User["User Service<br/>:8080"]
+        Book["Book Service<br/>:8080"]
+        Transaction["Transaction Service<br/>:8080"]
+    end
+
+    Browser --> Web
+    Browser -->|"OAuth and API"| Kong
+    Web -->|"Server-side API"| Kong
     Kong --> Auth
     Kong --> User
     Kong --> Book
@@ -148,14 +154,21 @@ flowchart LR
     Rabbit --> Transaction
 ```
 
-Kong is the public API entry point. It routes requests, introspects access
-tokens, checks endpoint scopes, removes the original bearer token, and forwards
-trusted identity headers. Internal service calls use private Compose DNS names.
-Each service owns its database; no service queries another service's schema.
+Kong is the only public API entry point. The frontend shares only its edge
+network; it cannot resolve or call a Go service directly. Kong routes requests,
+introspects access tokens, checks endpoint scopes, removes the original bearer
+token, clears client-supplied credential headers, and forwards trusted identity
+headers over the internal-only backend network. Internal service calls use
+private Compose DNS names. Each service owns its database; no service queries
+another service's schema.
 
 Borrowing uses a synchronous Transaction-to-Book reservation because stock must
 be decided immediately. Returning uses RabbitMQ and transactional outboxes so a
 committed return survives temporary broker or Book Service failures.
+
+Every loan is due exactly seven days after `borrowedAt`. A return at or before
+`dueAt` has no fine. The first instant after `dueAt` starts the first overdue day;
+each started 24-hour overdue period adds IDR 5,000.
 
 ## SOLID principles in the code
 

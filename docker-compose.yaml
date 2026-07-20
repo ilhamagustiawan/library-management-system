@@ -36,7 +36,8 @@ services:
       retries: 10
       start_period: 15s
     networks:
-      - gateway
+      - edge
+      - backend
 
   frontend:
     build:
@@ -69,7 +70,7 @@ services:
       retries: 20
       start_period: 20s
     networks:
-      - gateway
+      - edge
 
   auth-db:
     image: mysql:8.4.10
@@ -115,8 +116,6 @@ services:
       LOGIN_URL: http://localhost:3000/login
       SESSION_COOKIE_SECURE: "false"
     command: ["/bin/sh", "-c", "/app/auth-service migrate --action up && exec /app/auth-service serve"]
-    ports:
-      - 127.0.0.1:8081:8081
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8081/health/readiness"]
       interval: 5s
@@ -124,7 +123,7 @@ services:
       retries: 20
       start_period: 20s
     networks:
-      - gateway
+      - backend
       - auth-db
 
   user-db:
@@ -196,8 +195,6 @@ services:
       AUTH_SCOPE: identities:create
       RABBITMQ_URL: amqp://library:library_password@rabbitmq:5672/
     command: ["/bin/sh", "-c", "/app/user-service migrate --action up && exec /app/user-service serve"]
-    ports:
-      - 127.0.0.1:8082:8080
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/readiness"]
       interval: 5s
@@ -205,7 +202,7 @@ services:
       retries: 20
       start_period: 20s
     networks:
-      - gateway
+      - backend
       - user-db
       - events
 
@@ -259,8 +256,6 @@ services:
       TRANSACTION_SERVICE_CLIENT_ID: transaction-service
       RABBITMQ_URL: amqp://library:library_password@rabbitmq:5672/
     command: ["/bin/sh", "-c", "/app/book-service migrate --action up && exec /app/book-service serve"]
-    ports:
-      - 127.0.0.1:8083:8080
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/readiness"]
       interval: 5s
@@ -268,7 +263,7 @@ services:
       retries: 20
       start_period: 20s
     networks:
-      - gateway
+      - backend
       - book-db
       - events
 
@@ -326,8 +321,6 @@ services:
       FINE_DAILY_RATE_MINOR: "5000"
       STOCK_ACK_TIMEOUT: 5s
     command: ["/bin/sh", "-c", "/app/transaction-service migrate --action up && exec /app/transaction-service serve"]
-    ports:
-      - 127.0.0.1:8084:8080
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/readiness"]
       interval: 5s
@@ -335,12 +328,14 @@ services:
       retries: 20
       start_period: 20s
     networks:
-      - gateway
+      - backend
       - transaction-db
       - events
 
 networks:
-  gateway:
+  edge:
+  backend:
+    internal: true
   auth-db:
   user-db:
   events:

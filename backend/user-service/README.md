@@ -20,6 +20,9 @@ go vet ./...
 go build ./...
 ```
 
-Swagger UI: `http://127.0.0.1:8082/api/v1/docs/users/swagger` directly, or `http://127.0.0.1:8000/api/v1/docs/users/swagger` through Kong.
+With `go run . serve`, Swagger UI uses
+`http://127.0.0.1:8082/api/v1/docs/users/swagger`. The default Compose stack
+does not publish that service port; use
+`http://127.0.0.1:8000/api/v1/docs/users/swagger` through Kong.
 
 RabbitMQ publishes persistent `UserRegistered.v1` messages to `library.events` with routing key `user.registered.v1`. Delivery is at least once; consumers must deduplicate by `eventId`.

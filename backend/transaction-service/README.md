@@ -4,8 +4,10 @@ Owns loans, returns, fines, and transaction history. Go/Fiber structure matches
 `backend/auth-service`.
 
 Borrowing atomically reserves one copy through Book Service. A member may hold
-at most three unfinished loans. Loans are due after seven days; each started
-24-hour overdue period creates an IDR 5,000 charge on return.
+at most three unfinished loans. Loans are due exactly seven days after
+borrowing. A return at the due time has no fine; the first instant afterward
+starts the first IDR 5,000 overdue day. Each additional started 24-hour overdue
+period adds another IDR 5,000.
 
 Returning commits a `LoanReturned.v1` transactional-outbox event. Book Service
 updates inventory through RabbitMQ and responds with `BookStockUpdated.v1`.
@@ -23,8 +25,9 @@ go run . migrate --action up
 go run . serve
 ```
 
-Public API uses Kong prefix `/api/v1/transactions`. For direct local
-development, the service listens on `http://127.0.0.1:8084`.
+Public API uses Kong prefix `/api/v1/transactions`. The default Compose stack
+keeps the service on its private backend network. When run standalone for local
+development, it listens on `http://127.0.0.1:8084`.
 
 ## API documentation
 

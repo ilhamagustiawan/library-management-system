@@ -42,13 +42,14 @@ go run . serve
 
 Every command automatically loads `.env` from its current working directory. Already-exported environment variables take precedence.
 
-Or run everything in Docker:
+Or run everything in Docker. The default Compose stack keeps this service on
+the private backend network; access it through Kong on port `8000`:
 
 ```shell
-docker compose -f ../../docker-compose.yaml up --build auth-service
+../../scripts/setup.sh
 ```
 
-Health endpoints:
+When running `go run . serve` directly, health endpoints use port `8081`:
 
 ```shell
 curl http://localhost:8081/health/liveness

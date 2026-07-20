@@ -15,10 +15,13 @@ go vet ./...
 go build ./...
 ```
 
-Local server listens on `:8083`. Compose overrides the container listener to
-:8080` and publishes it on host port `8083`.
+The standalone local server listens on `:8083`. Compose overrides the container
+listener to `:8080` on its private backend network and does not publish that
+port to the host.
 
-Swagger UI: `http://127.0.0.1:8083/api/v1/docs/books/swagger`.
+Standalone Swagger UI:
+`http://127.0.0.1:8083/api/v1/docs/books/swagger`. Compose access goes through
+Kong at `http://127.0.0.1:8000/api/v1/docs/books/swagger`.
 
 ## APIs
 

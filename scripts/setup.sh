@@ -54,6 +54,23 @@ if ! "${compose[@]}" up --detach --build --wait --wait-timeout 180; then
   exit 1
 fi
 
+printf '%s\n' "Checking private service ports..."
+private_services=(
+  auth-service
+  user-service
+  book-service
+  transaction-service
+)
+for service in "${private_services[@]}"; do
+  container_id="$("${compose[@]}" ps --quiet "$service")"
+  published_ports="$(docker inspect --format '{{range $port, $bindings := .HostConfig.PortBindings}}{{if $bindings}}{{$port}} {{end}}{{end}}' "$container_id")"
+  if [[ -n "$published_ports" ]]; then
+    printf '%s\n' \
+      "Security check failed: $service publishes $published_ports. Remove its host port so requests cannot bypass Kong, then retry." >&2
+    exit 1
+  fi
+done
+
 printf '%s\n' "Checking gateway upstreams..."
 gateway_ready=false
 for _ in {1..20}; do

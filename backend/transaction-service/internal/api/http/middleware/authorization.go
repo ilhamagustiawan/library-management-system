@@ -17,7 +17,8 @@ type Credential struct {
 	Scopes  map[string]struct{}
 }
 
-// TODO: Authenticate gateway-injected headers before exposing this service outside local development.
+// RequireScope trusts headers created by Kong on the private backend network.
+// The service must never publish this listener directly to an untrusted network.
 func RequireScope(scope string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		subject := strings.TrimSpace(c.Get("X-Credential-Sub"))
