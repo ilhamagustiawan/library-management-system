@@ -3,7 +3,6 @@
 import { LogOut } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -16,27 +15,21 @@ export function LogoutForm({
   logoutEndpoint: string;
   tone?: "dark" | "light";
 }) {
-  const [state, setState] = useState<
-    { status: "idle" } | { status: "pending" } | { status: "error"; message: string }
-  >({ status: "idle" });
+  const [state, setState] = useState<{ status: "idle" } | { status: "pending" }>({
+    status: "idle",
+  });
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     setState({ status: "pending" });
-    const result = await AuthApi.logout(logoutEndpoint);
-    if (result.status === "error") {
-      setState(result);
-      return;
-    }
+    // Local teardown must not depend on Auth Service availability.
+    void AuthApi.logout(logoutEndpoint);
     form.submit();
   }
 
   return (
     <div>
-      {state.status === "error" && (
-        <Alert className="mb-3 bg-card text-card-foreground">{state.message}</Alert>
-      )}
       <form action="/api/auth/logout" method="post" onSubmit={handleSubmit}>
         <Button
           className={cn(

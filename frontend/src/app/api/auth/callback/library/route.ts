@@ -8,8 +8,8 @@ import { OAuthClient } from "@/features/auth/oauth-client";
 import { OAuthFlowCookie } from "@/features/auth/oauth-flow-cookie";
 import { WebSession } from "@/features/auth/web-session";
 
-function loginError(request: NextRequest, secureCookies: boolean, error: string) {
-  const url = new URL("/login", request.url);
+function loginError(appOrigin: string, secureCookies: boolean, error: string) {
+  const url = new URL("/login", appOrigin);
   url.searchParams.set("error", error);
   const response = NextResponse.redirect(url);
   response.cookies.set(AuthCookies.flowName, "", AuthCookies.options(secureCookies, 0));
@@ -19,13 +19,14 @@ function loginError(request: NextRequest, secureCookies: boolean, error: string)
 
 export async function GET(request: NextRequest) {
   const config = AuthConfig.load();
+  const appOrigin = new URL(config.oauth.redirectUri).origin;
   const sealedFlow = request.cookies.get(AuthCookies.flowName)?.value;
   if (sealedFlow === undefined) {
-    return loginError(request, config.secureCookies, "invalid_callback");
+    return loginError(appOrigin, config.secureCookies, "invalid_callback");
   }
   const openedFlow = OAuthFlowCookie.open(sealedFlow, config.sessionSecret);
   if (openedFlow.status === "invalid") {
-    return loginError(request, config.secureCookies, "invalid_callback");
+    return loginError(appOrigin, config.secureCookies, "invalid_callback");
   }
 
   const callback = OAuthCallback.validate(
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     openedFlow.flow,
   );
   if (callback.status === "error") {
-    return loginError(request, config.secureCookies, callback.error);
+    return loginError(appOrigin, config.secureCookies, callback.error);
   }
 
   const tokenResult = await OAuthClient.exchangeCode(
@@ -44,14 +45,14 @@ export async function GET(request: NextRequest) {
     openedFlow.flow.codeVerifier,
   );
   if (tokenResult.status === "error") {
-    return loginError(request, config.secureCookies, "token_exchange_failed");
+    return loginError(appOrigin, config.secureCookies, "token_exchange_failed");
   }
   const userResult = await OAuthClient.userInfo(config.oauth, tokenResult.tokens.accessToken);
   if (userResult.status === "error") {
-    return loginError(request, config.secureCookies, "user_info_failed");
+    return loginError(appOrigin, config.secureCookies, "user_info_failed");
   }
 
-  const response = NextResponse.redirect(new URL("/dashboard", request.url));
+  const response = NextResponse.redirect(new URL("/dashboard", appOrigin));
   response.cookies.set(
     AuthCookies.sessionName,
     WebSession.seal(

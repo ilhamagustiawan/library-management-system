@@ -82,6 +82,7 @@ describe("AuthApi.logout", () => {
       expect(String(input)).toBe("http://localhost:8000/api/v1/auth/logout");
       expect(init?.method).toBe("POST");
       expect(init?.credentials).toBe("include");
+      expect(init?.keepalive).toBe(true);
       return new Response(null, { status: 204 });
     };
 

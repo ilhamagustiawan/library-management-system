@@ -24,12 +24,17 @@ function session(overrides: Partial<WebSessionValue> = {}) {
   );
 }
 
-function request(path: string, origin: string, sealedSession?: string) {
+function request(
+  path: string,
+  origin: string,
+  sealedSession?: string,
+  serverOrigin = appOrigin,
+) {
   const headers = new Headers({ origin });
   if (sealedSession !== undefined) {
     headers.set("cookie", `${AuthCookies.sessionName}=${sealedSession}`);
   }
-  return new NextRequest(`${appOrigin}${path}`, { method: "POST", headers });
+  return new NextRequest(`${serverOrigin}${path}`, { method: "POST", headers });
 }
 
 function refreshedTokenResponse() {
@@ -119,5 +124,15 @@ describe("session routes", () => {
     expect(response.status).toBe(303);
     expect(response.cookies.get(AuthCookies.sessionName)?.maxAge).toBe(0);
     expect(response.cookies.get(AuthCookies.flowName)?.maxAge).toBe(0);
+  });
+
+  it("accepts configured origin when server uses an internal bind URL", async () => {
+    const response = await logout(
+      request("/api/auth/logout", appOrigin, session(), "http://0.0.0.0:3000"),
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`${appOrigin}/`);
+    expect(response.cookies.get(AuthCookies.sessionName)?.maxAge).toBe(0);
   });
 });

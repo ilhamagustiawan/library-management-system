@@ -11,15 +11,15 @@ const appOrigin = "http://localhost:3000";
 const authOrigin = "http://localhost:8000";
 const sessionSecret = "abcdef0123456789abcdef0123456789";
 
-function callbackRequest(query: string, flow?: OAuthFlow) {
-  const headers = new Headers();
+function callbackRequest(query: string, flow?: OAuthFlow, serverOrigin = appOrigin) {
+  const headers = new Headers({ host: new URL(appOrigin).host });
   if (flow !== undefined) {
     headers.set(
       "cookie",
       `${AuthCookies.flowName}=${OAuthFlowCookie.seal(flow, sessionSecret)}`,
     );
   }
-  return new NextRequest(`${appOrigin}/api/auth/callback/library?${query}`, { headers });
+  return new NextRequest(`${serverOrigin}/api/auth/callback/library?${query}`, { headers });
 }
 
 function tokenResponse() {
@@ -53,7 +53,7 @@ describe("OAuth login routes", () => {
   });
 
   it("starts authorization with PKCE and a sealed flow cookie", async () => {
-    const response = await startLogin();
+    const response = await startLogin(new NextRequest(`${appOrigin}/api/auth/login`));
 
     const location = response.headers.get("location");
     expect(location).not.toBeNull();
@@ -61,6 +61,26 @@ describe("OAuth login routes", () => {
     const target = new URL(location);
     expect(target.origin).toBe(authOrigin);
     expect(target.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(response.cookies.get(AuthCookies.flowName)?.httpOnly).toBe(true);
+  });
+
+  it("moves login to the configured callback origin before setting flow state", async () => {
+    const response = await startLogin(
+      new NextRequest("http://0.0.0.0:3000/api/auth/login"),
+    );
+
+    expect(response.headers.get("location")).toBe(`${appOrigin}/api/auth/login`);
+    expect(response.cookies.get(AuthCookies.flowName)).toBeUndefined();
+  });
+
+  it("starts login when public host matches despite internal bind URL", async () => {
+    const response = await startLogin(
+      new NextRequest("http://0.0.0.0:3000/api/auth/login", {
+        headers: { host: "localhost:3000" },
+      }),
+    );
+
+    expect(response.headers.get("location")).toContain(`${authOrigin}/oauth/authorize`);
     expect(response.cookies.get(AuthCookies.flowName)?.httpOnly).toBe(true);
   });
 
@@ -88,10 +108,16 @@ describe("OAuth login routes", () => {
     );
 
     const response = await callback(
-      callbackRequest("code=code-123&state=expected-state", flow),
+      callbackRequest(
+        "code=code-123&state=expected-state",
+        flow,
+        "http://0.0.0.0:3000",
+      ),
     );
 
-    expect(response.headers.get("location")).toContain("error=token_exchange_failed");
+    expect(response.headers.get("location")).toBe(
+      `${appOrigin}/login?error=token_exchange_failed`,
+    );
     expect(response.cookies.get(AuthCookies.sessionName)).toBeUndefined();
   });
 
@@ -102,7 +128,11 @@ describe("OAuth login routes", () => {
     vi.stubGlobal("fetch", fetcher);
 
     const response = await callback(
-      callbackRequest("code=code-123&state=expected-state", flow),
+      callbackRequest(
+        "code=code-123&state=expected-state",
+        flow,
+        "http://0.0.0.0:3000",
+      ),
     );
 
     expect(response.headers.get("location")).toContain("error=user_info_failed");
@@ -121,7 +151,11 @@ describe("OAuth login routes", () => {
     vi.stubGlobal("fetch", fetcher);
 
     const response = await callback(
-      callbackRequest("code=code-123&state=expected-state", flow),
+      callbackRequest(
+        "code=code-123&state=expected-state",
+        flow,
+        "http://0.0.0.0:3000",
+      ),
     );
 
     expect(response.headers.get("location")).toBe(`${appOrigin}/dashboard`);

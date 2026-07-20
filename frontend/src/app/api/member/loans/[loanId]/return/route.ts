@@ -137,7 +137,8 @@ export async function GET(request: NextRequest, context: Context) {
 }
 
 export async function POST(request: NextRequest, context: Context) {
-  if (!AuthRequest.hasSameOrigin(request)) {
+  const config = AuthConfig.load();
+  if (!AuthRequest.hasOrigin(request, config.oauth.redirectUri)) {
     return error(403, "invalid-input", "Request origin rejected. Reload this page and try again.");
   }
   const params = await loanID(context);

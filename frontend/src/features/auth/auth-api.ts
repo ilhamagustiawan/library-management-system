@@ -105,6 +105,7 @@ async function logout(endpoint: string, fetcher: typeof fetch = fetch): Promise<
       method: "POST",
       headers: { Accept: "application/json" },
       credentials: "include",
+      keepalive: true,
     });
   } catch {
     return {

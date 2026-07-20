@@ -38,7 +38,8 @@ function upstreamError(status: number, code: string | undefined) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!AuthRequest.hasSameOrigin(request)) {
+  const config = AuthConfig.load();
+  if (!AuthRequest.hasOrigin(request, config.oauth.redirectUri)) {
     return error(403, "invalid-input", "Request origin rejected. Reload this page and try again.");
   }
 
@@ -53,7 +54,6 @@ export async function POST(request: NextRequest) {
     return error(422, "invalid-input", "Book selection is invalid. Return to Browse and select a book.");
   }
 
-  const config = AuthConfig.load();
   const sealedSession = request.cookies.get(AuthCookies.sessionName)?.value;
   if (sealedSession === undefined) return error(401, "session-expired", "Session expired. Log in again.");
   const openedSession = WebSession.open(sealedSession, config.sessionSecret);

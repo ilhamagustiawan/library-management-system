@@ -24,18 +24,15 @@ describe("LogoutForm", () => {
     expect(form).toHaveAttribute("method", "post");
   });
 
-  it("shows remote logout failure and keeps local session", async () => {
+  it("submits local logout without waiting for auth-service logout", async () => {
     const user = userEvent.setup();
     const submit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("unavailable"))));
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
 
     render(<LogoutForm logoutEndpoint="http://localhost:8000/api/v1/auth/logout" />);
     await user.click(screen.getByRole("button", { name: "Log out" }));
 
-    expect(
-      await screen.findByText("Could not reach authentication service. You remain signed in; try again."),
-    ).toBeVisible();
-    expect(submit).not.toHaveBeenCalled();
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
   });
 
   it("supports member headers on light surfaces", () => {

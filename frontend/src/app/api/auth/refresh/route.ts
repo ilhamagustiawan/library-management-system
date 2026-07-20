@@ -17,7 +17,7 @@ function expiredSession(secureCookies: boolean) {
 
 export async function POST(request: NextRequest) {
   const config = AuthConfig.load();
-  if (!AuthRequest.hasSameOrigin(request)) {
+  if (!AuthRequest.hasOrigin(request, config.oauth.redirectUri)) {
     return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
   }
   const sealedSession = request.cookies.get(AuthCookies.sessionName)?.value;
