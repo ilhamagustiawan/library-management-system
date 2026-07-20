@@ -5,6 +5,13 @@ Kong API Gateway, MySQL, and RabbitMQ. The system supports member registration,
 OAuth login, catalog browsing, borrowing, returning, fines, and transaction
 history.
 
+## Showcase
+
+[![Watch the member portal walkthrough](docs/showcase/member-portal-demo-poster.png)](docs/showcase/member-portal-demo.mp4)
+
+[Watch the browser walkthrough (MP4)](docs/showcase/member-portal-demo.mp4):
+member dashboard, catalog search, book details, and loan history.
+
 ## Quick start
 
 ### Prerequisites
@@ -185,44 +192,211 @@ applied at the service boundaries:
 
 ## OAuth 2.0 and JWT implementation
 
-### Member Authorization Code flow
+Auth Service is the authorization server and token-state authority. Kong is the
+resource gateway for browser APIs. Next.js is a confidential OAuth client: the
+browser handles redirects, but client secrets and token requests remain
+server-side. Internal services use separate confidential clients with narrower
+grants.
 
-1. Next.js generates a random `state` and PKCE `code_verifier`, derives an
-   S256 `code_challenge`, and stores flow state in an encrypted HttpOnly
-   cookie. See [OAuth client](frontend/src/features/auth/oauth-client.ts#L61-L81).
-2. The browser opens `/oauth/authorize` through Kong. Auth Service requires
-   `response_type=code`, non-empty state, S256 PKCE, and an exact registered
-   redirect URI. See [authorization validation](backend/auth-service/internal/infra/oauth/server.go#L222-L253).
-3. After login, Auth Service returns a short-lived authorization code to the
-   registered Next.js callback.
-4. The Next.js server exchanges the code and verifier at `/oauth/token` using
-   HTTP Basic confidential-client authentication. Container-side requests use
-   `INTERNAL_GATEWAY_URL`; browser redirects retain the public `AUTH_ISSUER`.
-5. Access and refresh tokens are stored only inside an AES-256-GCM sealed,
-   HttpOnly, SameSite=Lax cookie. See [session encryption](frontend/src/features/auth/sealed-value.ts#L16-L60)
-   and [cookie policy](frontend/src/features/auth/auth-cookies.ts#L1-L13).
-6. Next.js rotates the refresh token shortly before access-token expiry. A
-   failed or invalid refresh clears the local session.
+### Supported grants and clients
 
-### Service-to-service flow
+| `grant_type` | Caller and client kind | Client authentication | Result | Used for |
+|---|---|---|---|---|
+| `authorization_code` | Next.js, `member-nextjs-web` (`authorization_code`) | HTTP Basic at `/oauth/token`; S256 PKCE binds code to browser flow | JWT access token and opaque refresh token | Interactive member login |
+| `refresh_token` | Next.js, same client and session | HTTP Basic plus client-bound refresh token | Rotated access and refresh tokens | Renewing an expiring web session |
+| `client_credentials` | User or Transaction Service (`client_credentials`) | HTTP Basic | JWT access token only | Narrow service-to-service calls |
 
-User Service and Transaction Service use the Client Credentials grant. Their
-client IDs have explicit scope and audience ceilings:
+`resource_server` is a client kind, not a grant. `kong-gateway` and
+`book-service` cannot obtain tokens; their credentials authorize only RFC 7662
+introspection. Unsupported grants, including Implicit and Resource Owner
+Password Credentials, are rejected. OpenID Connect and ID tokens are not
+implemented.
 
-- User Service: `identities:create`, audience `auth-service`.
-- Transaction Service: `book-stock:read`, `book-stock:reserve`, and
-  `book-stock:release`, audience `book-service`.
+### OAuth and session endpoints
 
-Service tokens use the client ID as `sub`, contain no human role, and never
-receive a refresh token.
+| Endpoint | Consumer | Purpose |
+|---|---|---|
+| `GET /oauth/authorize` | Browser through Kong | Validate client, exact callback, requested scopes, state, and S256 challenge; issue code |
+| `POST /oauth/token` | Confidential clients | Exchange one of the three supported grants |
+| `POST /oauth/introspect` | Provisioned resource servers | Read current access-token state using HTTP Basic |
+| `GET /.well-known/oauth-authorization-server` | OAuth clients and operators | Discover issuer, endpoints, grants, response types, PKCE method, and scopes |
+| `POST /api/v1/auth/login` | Browser through Kong | Create Auth Service login session, then resume authorization |
+| `GET /api/v1/oauth/userinfo` | Next.js | Resolve the member represented by an active access token |
 
-### Scope and audience authorization
+All token and introspection responses disable caching. Browser-visible
+authorization redirects use `AUTH_ISSUER`; container-side token and API calls
+use `INTERNAL_GATEWAY_URL` so the public issuer remains stable while private DNS
+handles service traffic.
 
-For a member token, granted scopes are the requested scopes intersected with
-the OAuth client's scopes and the user's role scopes. For a service token, only
-the client scope ceiling applies. All scopes in one token must target one
-audience. Invalid escalation requests fail with `invalid_scope`. See
-[scope resolution](backend/auth-service/internal/domain/entity/scope.go#L26-L70).
+### `authorization_code`: interactive member login
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Member
+    participant Browser
+    participant Web as Next.js server
+    participant Kong
+    participant Auth as Auth Service
+    participant Store as Auth MySQL
+
+    Browser->>Web: GET /api/auth/login
+    Web->>Web: Generate state, verifier, and S256 challenge
+    Web-->>Browser: 302 /oauth/authorize + sealed flow cookie
+    Browser->>Kong: GET /oauth/authorize
+    Kong->>Auth: Forward authorization request
+    alt No Auth Service session
+        Auth-->>Browser: 302 /login?return_to=authorize URL
+        Member->>Browser: Enter email and password
+        Browser->>Kong: POST /api/v1/auth/login
+        Kong->>Auth: Forward credentials and return_to
+        Auth->>Store: Verify credentials and create session
+        Auth-->>Browser: 302 original authorization URL
+        Browser->>Kong: Retry /oauth/authorize with session
+        Kong->>Auth: Forward authorization request
+    else Existing Auth Service session
+        Auth->>Store: Resolve current member
+    end
+    Auth->>Store: Validate client, redirect URI, role, and scopes
+    Auth->>Store: Persist short-lived one-time code
+    Auth-->>Browser: 302 callback?code=...&state=...
+    Browser->>Web: GET callback with code and state
+    alt Missing flow cookie or state mismatch
+        Web->>Web: Clear one-time flow cookie
+        Web-->>Browser: Return to login without token request
+    else Valid callback state
+        Web->>Web: Recover PKCE verifier
+        Web->>Kong: POST /oauth/token with Basic auth, code, verifier
+        Kong->>Auth: Forward token request
+        Auth->>Store: Consume code and validate PKCE/client
+        alt Valid code and verifier
+            Auth->>Store: Persist access and refresh token state
+            Auth-->>Web: JWT access token + opaque refresh token
+            Web->>Kong: GET /api/v1/oauth/userinfo with Bearer token
+            Kong->>Auth: Forward userinfo request
+            Auth->>Store: Load active token and member
+            Auth-->>Web: Member profile
+            Web->>Web: Seal tokens and profile in HttpOnly cookie
+            Web-->>Browser: 302 /dashboard
+        else Invalid code, client, redirect, or verifier
+            Auth-->>Web: OAuth error, no token issued
+            Web-->>Browser: Clear flow state and return to login
+        end
+    end
+```
+
+Next.js stores `state` and the PKCE `code_verifier` in a short-lived sealed
+HttpOnly cookie. Auth Service accepts only `response_type=code`, non-empty
+`state`, `code_challenge_method=S256`, and the client's exact registered
+redirect URI. Next.js validates callback state before sending the one-time code
+or verifier to the token endpoint. See [OAuth client](frontend/src/features/auth/oauth-client.ts)
+and [authorization validation](backend/auth-service/internal/infra/oauth/server.go).
+
+The current frontend requests member scopes only. The seeded admin account is
+available for direct OAuth/API testing, but an admin authorization request must
+ask for admin scopes; mixing member and admin scopes rejects the entire request
+with `invalid_scope`.
+
+### `refresh_token`: web-session rotation
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant Web as Next.js server
+    participant Auth as Auth Service
+    participant Store as Auth MySQL
+
+    Browser->>Web: POST /api/auth/refresh
+    Web->>Web: Check same origin and open sealed session
+    alt Cross-origin request
+        Web-->>Browser: 403 invalid_origin, cookie unchanged
+    else Missing or invalid sealed session
+        Web->>Web: Clear local session
+        Web-->>Browser: 401 session_expired
+    else Access token remains fresh
+        Web-->>Browser: 200 active, no rotation
+    else Access token nears expiry
+        Web->>Web: Coalesce concurrent rotation by token hash
+        Web->>Auth: POST /oauth/token with Basic auth and refresh_token
+        Auth->>Store: Load refresh token and match client
+        Auth->>Store: Recheck current client, role, scopes, and audience
+        alt Refresh remains valid
+            Auth->>Store: Remove old token state and persist replacement
+            Auth-->>Web: New access token + rotated refresh token
+            Web->>Web: Replace sealed HttpOnly session cookie
+            Web-->>Browser: 200 refreshed
+        else Expired, replayed, revoked, wrong client, or reduced grant
+            Auth-->>Web: invalid_grant or rejected request
+            Web->>Web: Clear local session
+            Web-->>Browser: 401 session_expired, return to login
+        end
+    end
+```
+
+Refresh is a server-side, same-origin POST. Next.js skips rotation while the
+access token remains fresh and coalesces concurrent refreshes by a hash of the
+opaque token. Auth Service binds refresh state to the original client, rotates
+both tokens, invalidates prior token state, and rechecks the user's current role
+plus the client's current scope ceiling. Reduced permission therefore takes
+effect at the next rotation instead of extending stale authority.
+
+### `client_credentials`: internal service calls
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Internal service
+    participant Auth as Auth Service
+    participant Store as Auth MySQL
+    participant Resource as Target service
+
+    Client->>Auth: POST /oauth/token with Basic auth, client_credentials, scopes
+    Auth->>Store: Verify confidential client and allowed scopes
+    alt Allowed scopes target one audience
+        Auth->>Store: Persist JWT access-token state
+        Auth-->>Client: Access token only, sub=client_id, no role
+        alt User Service identity creation
+            Client->>Auth: POST /internal/identities with Bearer token
+            Auth->>Store: Check user-service, auth-service audience, identities:create
+            Auth-->>Client: Create or replay member identity
+        else Transaction Service stock operation
+            Client->>Resource: Reserve or release stock with Bearer token
+            Resource->>Auth: POST /oauth/introspect as book-service
+            Auth->>Store: Load current access-token state
+            Auth-->>Resource: Active, subject, issuer, audience, scopes, timestamps
+            Resource->>Resource: Enforce transaction-service and required stock scope
+            Resource-->>Client: Stock result
+        end
+    else Bad credentials, scope escalation, or mixed audiences
+        Auth-->>Client: invalid_client or invalid_scope, no token issued
+    end
+```
+
+Concrete service cases:
+
+| Client | Requested scopes | Audience | Resource-side validation |
+|---|---|---|---|
+| `user-service` | `identities:create` | `auth-service` | Auth verifies active state, exact client/subject, audience, and scope before identity creation |
+| `transaction-service` | `book-stock:reserve book-stock:release` | `book-service` | Book introspects through Auth, then verifies issuer, expiry, exact client/subject, audience, and operation scope |
+
+Both callers cache service tokens until 30 seconds before expiry. A rejected
+cached User Service token is cleared before retry. Service tokens set
+`sub=client_id`, omit `role`, and never receive refresh tokens.
+
+### Scope, audience, and role decisions
+
+Every requested scope must exist in both the client's scope ceiling and, for a
+human token, the current role's scope set. The resolver rejects rather than
+silently dropping unauthorized scopes. Every scope in one token must also map
+to one audience. See [scope resolution](backend/auth-service/internal/domain/entity/scope.go).
+
+| Principal | Allowed development scopes | Audience |
+|---|---|---|
+| `member` | `books:read`, `loans:borrow:self`, `loans:return:self`, `transactions:read:self` | `library-api` |
+| `admin` | `books:manage`, `fines:manage`, `loans:return:any`, `transactions:read:any` | `library-api` |
+| `user-service` | `identities:create` | `auth-service` |
+| `transaction-service` | `book-stock:read`, `book-stock:reserve`, `book-stock:release` | `book-service` |
 
 ### JWT and token lifecycle
 
@@ -247,13 +421,15 @@ the previous access and refresh records, enabling immediate invalidation.
 
 Kong validates protected browser requests through the RFC 7662 introspection
 endpoint. It checks active state, expiry, issuer, audience, subject, role, and
-required scope before forwarding trusted `X-Credential-*` headers. See
-[Kong introspection plugin](infra/kong/plugins/lms-oauth2-introspection/handler.lua#L138-L186).
-Book Service independently introspects internal Transaction Service tokens.
+route-required scopes before stripping the bearer token and forwarding trusted
+`X-Credential-*` headers. An inactive or expired token returns `401`; valid but
+insufficient authority returns `403`; introspection failure or malformed active
+metadata fails closed with `503`. See [Kong introspection plugin](infra/kong/plugins/lms-oauth2-introspection/handler.lua).
 
-The system intentionally supports Authorization Code, Refresh Token, and
-Client Credentials grants only. It does not implement Implicit Grant, Resource
-Owner Password Credentials, OpenID Connect, or ID tokens.
+Access and refresh tokens never enter browser-readable storage. Next.js seals
+them with AES-256-GCM in an HttpOnly, SameSite=Lax cookie; production must also
+set `Secure`. See [session encryption](frontend/src/features/auth/sealed-value.ts)
+and [cookie policy](frontend/src/features/auth/auth-cookies.ts).
 
 ## Development checks
 
